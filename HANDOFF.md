@@ -1,131 +1,65 @@
 # ComfyUI FlowPack 开发交接
 
-最后更新：2026-09-11
-仓库：[LightyearXizIl/ComfyUI-FlowPack](https://github.com/LightyearXizIl/ComfyUI-FlowPack)
-主分支：`main`
-当前版本：`0.0.2`
+最后更新：2026-09-11｜工作分支：`main`｜当前源码版本：`0.1.0`（本地候选，未发布）
 
-## 1. 先读结论
+## 结论
 
-当前仓库是 **0.0.2 工程预览版**，不是已完成真实 ComfyUI 环境部署验证的完整产品。
+`v0.1.0` 已完成 A–F 基线封存、六区壳层、运行时中英双语、受限 ZIP staging、schema v6 迁移备份、只读 Desktop 适配器和更新元数据校验。它**不是**已完成实机验收的正式版：真实 Desktop 写入入口仍禁用，L1–L4、journal 恢复、安装/升级/卸载、下载续传和干净机安装器验收均未完成。
 
-- M0 本机工程出口已完成：WPF 壳层、九个独立页面、导航和空状态修复、测试与安装器构建链路均已有证据。
-- 资源库 SQLite 持久化、主题偏好、格式 1 清单、`.cpack` 导入/不完整工作流包导出、原始工作流保留、Worker IPC、经 SHA-256 校验的 staging 下载、任务记录、列表筛选和脱敏诊断摘要已完成本机自动化验证。
-- 真实 ComfyUI Desktop 绑定、部署、恢复、完整离线包、试运行、维护、安装生命周期和兼容矩阵仍待实机验证；这仍然**不代表 M10 完整验收通过**。
-- 禁止用模拟连接、模拟资源、模拟任务或编造进度把未实现能力展示为已完成。
+不要把本地候选构建、自动化单测或页面文案当成正式发布/实机验证证据。
 
-完整范围、安全边界和阶段出口以 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) 为准；需求追踪以 [`REQUIREMENTS_ACCEPTANCE.md`](REQUIREMENTS_ACCEPTANCE.md) 为准。
+## Git 与提交边界
 
-## 2. Git 与发布状态
+- A–F 后端基础已独立提交：`7c539f4 feat: add ComfyUI resource foundations`。
+- 本轮 v0.1.0 壳层、安全与文档改动待提交；完成检查后应与 A–F 分开提交。
+- `.workbuddy/` 已在 `.gitignore`，不得提交。
+- 已生成本地安装器，未执行推送、标签、GitHub Release 或远程发布；该安装器为 `NotSigned`，不能声称已签名。
 
-| 项目 | 当前事实 |
-| --- | --- |
-| `v0.0.2` 源码提交 | `4e3a95cd5ebea5b5edff8b4806dbffa435369264` |
-| GitHub Actions | [运行 34579299090](https://github.com/LightyearXizIl/ComfyUI-FlowPack/actions/runs/34579299090)，结论为 `success` |
-| GitHub Release | [`v0.0.2`](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.2)，非草稿、非预发布 |
-| 远程安装包 | [ComfyUI-FlowPack-0.0.2-Setup.exe](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/download/v0.0.2/ComfyUI-FlowPack-0.0.2-Setup.exe) |
-| 远程大小与 SHA-256 | 74,284,159 字节；`DD4498F0938290AC4F9E5DD41DED367D12E51FC39B0712F73372F521ED2A75A3` |
-| 本地安装包 | `artifacts/installer/ComfyUI-FlowPack-0.0.2-Setup.exe` |
-| 本地大小与 SHA-256 | 74,275,707 字节；`E34524FBD4CDE48C64AE82A754408566FA20717A5BB10FDB9CFF901FE8197317` |
-| 代码签名 | `NotSigned`，不能声称已签名 |
+## 当前实现
 
-本地构建已通过锁定还原、Debug/Release 各 53 项测试、自包含发布和安装器编译。远程资产已核对 GitHub 服务器摘要与 `SHA256SUMS.txt` 一致，但本机没有重新执行安装、启动、卸载或完整下载远程安装包，因此不能登记“安装生命周期”或“远程下载后本机安装”通过。两份安装包来自不同构建，大小和哈希不同是已记录事实，不能把本地哈希用于验证远程文件。
+| 区域 | 已实现 | 明确边界 |
+| --- | --- | --- |
+| 壳层与语言 | `Home / Library / Packaging / Install / Tasks / Settings`；资源库聚合工作流、模型、节点；安装聚合包和预览；`ILocalizationService` 支持系统、简中、英文即时切换并保存偏好 | 历史视图中的所有遗留中文尚未全部资源键化；需补 UI 自动化与高对比验证 |
+| 包与导出 | `.cpack`、`.cpack.json`、展开目录和原生 ZIP 识别；原生 ZIP 私有 staging；ZIP64 大模型不压缩导出 | `.cpack` 三格式统一预览、全部依赖证据和 4 GB 实体回归未完成 |
+| staging 安全 | 拒绝 traversal、绝对/盘符/UNC/ADS、保留名、重复路径、链接和超量展开；失败删除 `.incoming-*` | 未做真实 4 GB、空间不足/强制中止的完整矩阵 |
+| 资源库 | schema v6；v5 迁移前 `VACUUM INTO` 备份；新增资源、引用、安装、缓存、尝试、journal、备份、验证报告表 | App 仍有历史直接数据库访问；尚未完全收口为 Worker 唯一写者；journal 没有恢复执行器 |
+| Worker | 协议 v2；持久化下载、状态与任务读取；安装计划/验证命令明确返回 `safety-gate-not-met` | 暂停/继续/取消/重试、每实例串行、下载并发 3、重连与写锁尚未实现 |
+| Desktop | `OfficialComfyDesktopAdapter` 从只读探测生成目标指纹和冻结计划；默认 `AllowsWriteExecution=false` | 未知/普通真实实例禁止写；未实现配置受管段、实例锁、停机、Python wheel 策略或写前复检 |
+| 更新与安装器 | GitHub latest release 检查要求 HTTPS setup 资产及同名 `SHA256SUMS.txt` 行；设置页可手动检查；Inno 开启语言选择/安装目录/保留语言和目录 | 不下载、不启动安装器、无 24h 冷却开关；中文 `.isl` 是最小覆盖层，发布前须替换为固定的完整 MIT 上游翻译 |
 
-详细证据见 [`docs/RELEASE_0.0.2.md`](docs/RELEASE_0.0.2.md)。`v0.0.2` 已正式发布，不要移动或重写该标签；后续文档和代码应通过新提交推进。
+## 安全不变量
 
-## 3. 当前工程结构
+1. 不修改 Desktop 的 `resource/ComfyUI`。
+2. 不对真实 Desktop、Python、模型或节点做写入；`StartInstallCommand` 必须继续禁用，直到隔离实例实测通过。
+3. 所有下载仅写 FlowPack staging；不允许任意 HTTP 或第三方脚本自动执行。
+4. 计划执行必须重新核对目标指纹、磁盘空间、冲突和备份；同名异哈希、本地修改、外部节点和 Python 替换均应阻断。
+5. 未来 schema 拒写；迁移失败不能清空旧库。
 
-| 模块 | 当前职责与状态 |
-| --- | --- |
-| `src/FlowPack.App` | WPF 桌面壳层、导航、主题切换、清单文件选择与会话内展示 |
-| `src/FlowPack.App/Views` | 九个独立页面 View，由单一页面宿主切换 |
-| `src/FlowPack.Core` | 少量契约、主题定义和安全安装规划骨架；尚未冻结格式 1 |
-| `src/FlowPack.Infrastructure` | 清单读取和资源库路径校验骨架；尚无 SQLite 持久化 |
-| `src/FlowPack.ComfyUI` | 仅有早期 `ComfyUiInspector` 骨架，不能用于真实写入决策 |
-| `src/FlowPack.Worker` | 只输出一行就绪信息；没有 IPC、任务状态机或执行能力 |
-| `src/FlowPack.Tests` | 当前单元/UI 壳层测试 |
-| `src/FlowPack.Smoke` | 当前基础 Smoke 入口 |
+## 已验证的本机证据
 
-界面基准见 [`FRONTEND_REFERENCE.md`](FRONTEND_REFERENCE.md)。当前 Logo 唯一源文件是 `LOGO 图标.png`，安装与程序图标使用由它生成的 `src/FlowPack.App/Assets/FlowPack.ico`。
+- 锁定还原、Debug 与 Release 均为 **101/101**，`git diff --check` 通过。
+- 本地安装器：`artifacts/installer/ComfyUI-FlowPack-0.1.0-Setup.exe`，74,393,810 字节，SHA-256 `ECBAFDEFD25CA7896BF21F45D49DDF7C05C1B81ADF099AB0D42D73A93F1A5E20`，Authenticode `NotSigned`。仅验证生成，未做干净机安装/卸载。
+- 本机只读确认过 Desktop 配置和实例路径；未进行写入、停机、配置修改或真实生成。
 
-## 4. 已完成范围
+## 下一步（按安全依赖顺序）
 
-- 九个页面已从同一长页面拆为独立 View，并由 `ContentControl` 承载。
-- 顶部主导航按内容区真实居中；960、1280、1600 DIP 已做回归。
-- 修复按钮模板 Padding、焦点和禁用状态。
-- 正式启动为空资源、空任务和“尚未检查环境”，不预置虚假连接或进度。
-- `.NET SDK 10.0.112`、中央 NuGet 版本和各项目 `packages.lock.json` 已锁定。
-- Solution 已覆盖 Debug/Release 的 App、Core、Infrastructure、ComfyUI、Worker、Tests 和 Smoke。
-- 本机 Debug/Release 各 53 项测试通过；Worker IPC 和 WPF Shell 冒烟通过。真实 Desktop 与安装生命周期仍未复验。
-- Windows x64 自包含发布、Inno Setup 安装器和 GitHub Release 工作流已建立。
+1. 提交本轮源码与 v0.1.0 文档，先跑锁定还原、Debug/Release、diff 检查。
+2. 将库写操作收口到 Worker：实现 requestId 幂等、库锁、任务尝试、暂停/继续/取消/重试及 journal 恢复报告。
+3. 以两个隔离官方 Desktop 实例实测适配器、配置备份受管段、实例锁、源/目标哈希与 Python wheel 冲突策略；不要用当前真实配置目录写测。
+4. 实现 L1–L3；L4 只跟踪 FlowPack 发出的 `prompt_id`，禁止清全局队列或中断他人任务。
+5. 补齐 `.cpack` 三格式往返、ZIP64/恶意归档、HTTP 恢复、DPI/高对比/键盘和安装器生命周期测试。
+6. 取得明确授权后才构建、签名（如有证书）、打标签、推送和发布远程 `v0.1.0`。
 
-## 5. 不能越过的安全边界
+## 关键文件
 
-1. `ShellViewModel.StartInstallCommand` 当前故意禁用。真实检查、计划摘要、用户确认和 Worker 复检完成前，不得直接启用安装按钮。
-2. 当前 `ComfyUiInspector` 会递归抓取第一个 `python*.exe` 并猜测 `user` 目录。实施 M2 时必须按真实 Desktop 版本、配置来源和只读证据重建，不能把这段骨架接入写操作。
-3. App 只负责交互与显示；所有资源库和 ComfyUI 写操作必须由 Worker 执行，并经过持久化计划、实例锁、指纹复检、日志和恢复机制。
-4. UI 断开不能等同于取消任务；后续 Worker 必须支持重连和任务恢复。
-5. 任何安装、升级、卸载和重装都必须保留用户资源、数据库与主题；没有真实保留测试前不能声称通过 M10。
-6. 当前没有签名证书，也没有仓库许可证文件。代码签名和开源许可证都需要明确决策，不能自行声明。
-7. 当前 Inno Setup 安装界面使用官方英文语言文件，应用界面仍为中文。这是已知限制，不应写成简体中文安装器。
+- [ShellViewModel.cs](src/FlowPack.App/ShellViewModel.cs)：页面状态、语言与手动更新检查，安装命令仍禁用。
+- [LocalizationService.cs](src/FlowPack.App/Services/LocalizationService.cs)：双语偏好和资源键。
+- [NativePackageStagingService.cs](src/FlowPack.Infrastructure/NativePackageStagingService.cs)：普通 ZIP 私有 staging。
+- [ResourceLibraryDatabase.cs](src/FlowPack.Infrastructure/ResourceLibraryDatabase.cs)：schema v6 与迁移备份。
+- [DesktopAdapter.cs](src/FlowPack.ComfyUI/DesktopAdapter.cs)：只读适配和冻结计划。
+- [FlowPack.iss](installer/FlowPack.iss)：安装器语言/目录/升级保留配置。
+- [REQUIREMENTS_ACCEPTANCE.md](REQUIREMENTS_ACCEPTANCE.md)：完整验收表；未具备实机证据的条目不得关闭。
 
-## 6. 下一阶段：实机 M2–M10 验证
+## 正式出口条件
 
-下一位开发者应先在隔离的官方 ComfyUI Desktop 实例上完成只读识别和绑定，再进入部署验证。当前代码的本机功能不能替代真实写入、恢复或试运行证据。
-
-建议按以下顺序推进：
-
-1. 准备与日常环境隔离的官方 Desktop、资源库和恢复基线。
-2. 执行只读发现、手选确认、实例指纹及路径保护验证；未知环境不得开启安装。
-3. 验证 staging 下载、任务中断恢复和完整 `.cpack` 在隔离环境中的真实行为。
-4. 仅在通过目标实例、资源、恢复与试运行矩阵后，才实现并启用部署写入。
-
-阶段表在 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md#13-分阶段执行顺序依赖与阶段出口)。其中 M5–M7 才覆盖真实部署、资源包导出和试运行，M8 覆盖完整九页与主题，M9 是综合验收，M10 是最终交付验收。
-
-## 7. 本地验证与构建
-
-在仓库根目录使用 PowerShell：
-
-```powershell
-dotnet restore .\FlowPack.sln --locked-mode
-dotnet test .\FlowPack.sln -c Debug --no-restore
-dotnet test .\FlowPack.sln -c Release --no-restore
-.\build\Build-Release.ps1 -Version 0.0.2
-```
-
-生成安装器需要 Windows x64、.NET SDK 10.0.112 和 Inno Setup 6。构建脚本只会重建仓库内的 `artifacts/publish/` 与 `artifacts/installer/`；输出目录受仓库路径校验保护。安装器位于 `artifacts/installer/`。
-
-发布前还需要做真实安装生命周期检查，不能只以 `dotnet test` 或安装器编译成功代替安装、启动、卸载和数据保留证据。
-
-## 8. 版本与后续发布
-
-版本采用三段式十进制满 10 进 1：`0.0.9` 的下一版是 `0.1.0`，`0.9.9` 的下一版是 `1.0.0`。详见 [`VERSIONING.md`](VERSIONING.md)。
-
-后续正式发布至少需要：
-
-1. 先完成目标阶段的代码、测试和验收证据。
-2. 同步 `VERSION`、项目版本、`CHANGELOG.md`、发布说明和本交接文档。
-3. 运行锁定还原、Debug/Release 测试、发布构建与隔离安装生命周期检查。
-4. 提交后只创建一次对应版本标签并推送；已发布标签不得移动。
-5. 等待目标标签的 GitHub Actions 完成，核对 Release 状态、资产大小、服务器摘要和校验清单。
-6. 如果用户需要“远程下载可安装”的证据，还必须实际下载远程资产并重新执行本机安装验证。
-
-现有工作流使用 `gh release create` 创建新 Release；对同一标签直接重跑可能遇到 Release 已存在的问题。需要重跑发布时先审查工作流行为，不要删除正式 Release 或移动标签来绕过失败。
-
-## 9. 开发与验收约定
-
-- 每个已确认缺陷都应增加回归覆盖。
-- 对真实 Desktop、Python、GPU、模型库或节点行为没有证据时，明确标记“待验证”，不要猜测路径或兼容性。
-- 阶段证据放到 `artifacts/acceptance/<阶段>/<运行标识>/`，记录源码标识、环境、测试结果、截图、脱敏日志和关键哈希。
-- `artifacts/` 当前被 Git 忽略；需要长期保留的结论应整理进 `docs/`，大体积证据不要直接提交。
-- 任何发布结论都要区分本地构建、CI 成功、远程资产存在、远程下载复验和真实设备验收，不能互相替代。
-- 处理现有工作区时保留用户未提交修改，禁止用重置或覆盖清理无关改动。
-
-## 10. 交接检查清单
-
-- [ ] 阅读 `IMPLEMENTATION_PLAN.md`、`REQUIREMENTS_ACCEPTANCE.md` 和本文件。
-- [ ] 运行 `git status`，确认没有覆盖前任或用户的未提交修改。
-- [ ] 运行锁定还原和 Debug/Release 测试，记录实际通过数量。
-- [ ] 仅在有真实证据时更新阶段状态与验收结论。
-- [ ] 完成 M1 后更新本文件的当前提交、已完成范围、未完成范围和下一步。
-- [ ] 发版时同步版本、变更记录、发布说明、交接文档和远程验证结果。
+只有完成隔离 Desktop 双实例、共享资源、节点修改、Python 冲突、Worker 中止恢复、L1–L4、修复/升级/卸载/迁移、离线包、干净 Windows 安装、升级/卸载/重装保留验证，且记录实际产物/日志/截图后，才可以关闭 M10 并称为正式版。
