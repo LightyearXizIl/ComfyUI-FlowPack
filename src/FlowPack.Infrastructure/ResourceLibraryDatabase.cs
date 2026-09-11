@@ -11,7 +11,7 @@ namespace FlowPack.Infrastructure;
 /// </summary>
 public sealed class ResourceLibraryDatabase : IAsyncDisposable
 {
-    private const int CurrentSchemaVersion = 5;
+    private const int CurrentSchemaVersion = 6;
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -51,6 +51,14 @@ public sealed class ResourceLibraryDatabase : IAsyncDisposable
             }
 
             await ExecuteAsync(connection, "PRAGMA foreign_keys = ON; PRAGMA journal_mode = DELETE;", cancellationToken);
+            if (hasSchemaInfo)
+            {
+                var version = await GetSchemaVersionAsync(connection, cancellationToken);
+                if (version < CurrentSchemaVersion)
+                {
+                    await BackupBeforeMigrationAsync(connection, version, cancellationToken);
+                }
+            }
             await ExecuteAsync(connection, """
                 CREATE TABLE IF NOT EXISTS SchemaInfo (
                     name TEXT NOT NULL PRIMARY KEY,
@@ -107,6 +115,69 @@ public sealed class ResourceLibraryDatabase : IAsyncDisposable
                     error_message TEXT NULL,
                     created_at_utc TEXT NOT NULL,
                     updated_at_utc TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS Resources (
+                    resource_id TEXT NOT NULL PRIMARY KEY,
+                    package_id TEXT NULL,
+                    resource_kind TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    sha256 TEXT NULL,
+                    size_bytes INTEGER NULL,
+                    source_url TEXT NULL,
+                    recorded_at_utc TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS PackageReferences (
+                    package_id TEXT NOT NULL,
+                    package_version TEXT NOT NULL,
+                    resource_id TEXT NOT NULL,
+                    PRIMARY KEY (package_id, package_version, resource_id)
+                );
+                CREATE TABLE IF NOT EXISTS InstallRecords (
+                    install_id TEXT NOT NULL PRIMARY KEY,
+                    plan_id TEXT NOT NULL,
+                    target_fingerprint TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    recorded_at_utc TEXT NOT NULL,
+                    report_json TEXT NULL
+                );
+                CREATE TABLE IF NOT EXISTS DownloadCache (
+                    cache_key TEXT NOT NULL PRIMARY KEY,
+                    source_url TEXT NOT NULL,
+                    etag TEXT NULL,
+                    sha256 TEXT NULL,
+                    local_path TEXT NOT NULL,
+                    size_bytes INTEGER NULL,
+                    updated_at_utc TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS TaskAttempts (
+                    task_id TEXT NOT NULL,
+                    attempt_number INTEGER NOT NULL,
+                    state TEXT NOT NULL,
+                    error_code TEXT NULL,
+                    created_at_utc TEXT NOT NULL,
+                    PRIMARY KEY (task_id, attempt_number)
+                );
+                CREATE TABLE IF NOT EXISTS OperationJournal (
+                    operation_id TEXT NOT NULL,
+                    sequence INTEGER NOT NULL,
+                    state TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    created_at_utc TEXT NOT NULL,
+                    PRIMARY KEY (operation_id, sequence)
+                );
+                CREATE TABLE IF NOT EXISTS Backups (
+                    backup_id TEXT NOT NULL PRIMARY KEY,
+                    backup_path TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    created_at_utc TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS VerificationReports (
+                    report_id TEXT NOT NULL PRIMARY KEY,
+                    plan_id TEXT NULL,
+                    level TEXT NOT NULL,
+                    passed INTEGER NOT NULL,
+                    report_json TEXT NOT NULL,
+                    created_at_utc TEXT NOT NULL
                 );
                 """, cancellationToken);
 
@@ -497,6 +568,17 @@ public sealed class ResourceLibraryDatabase : IAsyncDisposable
         }.ToString());
         await connection.OpenAsync(cancellationToken);
         return connection;
+    }
+
+    private async Task BackupBeforeMigrationAsync(SqliteConnection connection, int previousVersion, CancellationToken cancellationToken)
+    {
+        var backupDirectory = Path.Combine(LibraryPath, "state", "backups");
+        Directory.CreateDirectory(backupDirectory);
+        var backupPath = Path.Combine(backupDirectory, $"flowpack-v{previousVersion}-{DateTimeOffset.UtcNow:yyyyMMddHHmmssfff}.db");
+        await using var backupCommand = connection.CreateCommand();
+        backupCommand.CommandText = "VACUUM INTO $backupPath;";
+        backupCommand.Parameters.AddWithValue("$backupPath", backupPath);
+        await backupCommand.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task ExecuteAsync(SqliteConnection connection, string commandText, CancellationToken cancellationToken)

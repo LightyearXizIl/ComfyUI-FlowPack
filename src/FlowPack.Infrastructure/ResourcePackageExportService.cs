@@ -68,7 +68,7 @@ public sealed class ResourcePackageExportService
                 var model = models[i];
                 var fileName = SanitizeFileName(Path.GetFileName(model.SourcePath), i);
                 var entryPath = ModelsDir + "/" + model.Category + "/" + UniqueName(used, fileName);
-                await WriteFileFromDiskAsync(archive, entryPath, model.SourcePath, cancellationToken);
+                await WriteFileFromDiskAsync(archive, entryPath, model.SourcePath, CompressionLevel.NoCompression, cancellationToken);
                 bundled.Add(new BundledModel(fileName, model.Category, model.SourcePath, entryPath));
             }
             return new ResourcePackageResult(outputPath, 0, bundled, [], [], []);
@@ -146,7 +146,7 @@ public sealed class ResourcePackageExportService
                     var source = Path.Combine(modelsRoot, model.LocalPath);
                     if (!File.Exists(source)) { missingModels.Add(model.Reference); continue; }
                     var entryPath = ModelsDir + "/" + UniqueName(usedModel, model.LocalPath);
-                    await WriteFileFromDiskAsync(archive, entryPath, source, cancellationToken);
+                    await WriteFileFromDiskAsync(archive, entryPath, source, CompressionLevel.NoCompression, cancellationToken);
                     bundledModels.Add(new BundledModel(model.FileName, model.CategoryHint ?? "", source, entryPath));
                 }
             }
@@ -215,10 +215,15 @@ public sealed class ResourcePackageExportService
         await writer.WriteAsync(text);
     }
 
-    private static async Task WriteFileFromDiskAsync(ZipArchive archive, string entryPath, string sourcePath, CancellationToken cancellationToken)
+    private static async Task WriteFileFromDiskAsync(
+        ZipArchive archive,
+        string entryPath,
+        string sourcePath,
+        CompressionLevel compression,
+        CancellationToken cancellationToken)
     {
         await using var source = File.OpenRead(sourcePath);
-        var entry = archive.CreateEntry(NormalizeSlashes(entryPath), CompressionLevel.Optimal);
+        var entry = archive.CreateEntry(NormalizeSlashes(entryPath), compression);
         await using var entryStream = entry.Open();
         await source.CopyToAsync(entryStream, cancellationToken);
     }
@@ -230,7 +235,7 @@ public sealed class ResourcePackageExportService
             cancellationToken.ThrowIfCancellationRequested();
             var relative = NormalizeSlashes(Path.GetRelativePath(sourceDir, file));
             var entryPath = zipDir.TrimEnd('/') + "/" + relative;
-            await WriteFileFromDiskAsync(archive, entryPath, file, cancellationToken);
+            await WriteFileFromDiskAsync(archive, entryPath, file, CompressionLevel.Optimal, cancellationToken);
         }
     }
 

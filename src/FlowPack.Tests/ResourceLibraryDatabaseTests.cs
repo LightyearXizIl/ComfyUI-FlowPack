@@ -133,7 +133,7 @@ public sealed class ResourceLibraryDatabaseTests : IDisposable
             await using var command = connection.CreateCommand();
             command.CommandText = """
                 CREATE TABLE SchemaInfo (name TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL);
-                INSERT INTO SchemaInfo (name, value) VALUES ('schema_version', '6');
+                INSERT INTO SchemaInfo (name, value) VALUES ('schema_version', '7');
                 """;
             await command.ExecuteNonQueryAsync();
         }
@@ -149,6 +149,31 @@ public sealed class ResourceLibraryDatabaseTests : IDisposable
             verificationCommand.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'PackageDrafts';";
             Assert.Null(await verificationCommand.ExecuteScalarAsync());
         }
+    }
+
+    [Fact]
+    public async Task Version_five_library_is_backed_up_before_the_schema_six_upgrade()
+    {
+        var databasePath = Path.Combine(_libraryPath, "state", "flowpack.db");
+        Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
+        var connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath, Pooling = false }.ToString();
+        await using (var connection = new SqliteConnection(connectionString))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TABLE SchemaInfo (name TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL); INSERT INTO SchemaInfo VALUES ('schema_version', '5');";
+            await command.ExecuteNonQueryAsync();
+        }
+
+        await using var database = new ResourceLibraryDatabase(_libraryPath);
+        await database.InitializeAsync();
+
+        Assert.NotEmpty(Directory.EnumerateFiles(Path.Combine(_libraryPath, "state", "backups"), "flowpack-v5-*.db"));
+        await using var verification = new SqliteConnection(connectionString);
+        await verification.OpenAsync();
+        await using var versionCommand = verification.CreateCommand();
+        versionCommand.CommandText = "SELECT value FROM SchemaInfo WHERE name = 'schema_version';";
+        Assert.Equal("6", (string?)await versionCommand.ExecuteScalarAsync());
     }
 
     [Fact]

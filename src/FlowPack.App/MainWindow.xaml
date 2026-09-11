@@ -12,20 +12,13 @@
         Icon="Assets/FlowPack.ico"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBrush}">
-  <Window.DataContext>
-    <local:ShellViewModel />
-  </Window.DataContext>
-
   <Window.Resources>
     <DataTemplate x:Key="HomePageTemplate"><views:HomeView /></DataTemplate>
-    <DataTemplate x:Key="PackagesPageTemplate"><views:PackagesView /></DataTemplate>
-    <DataTemplate x:Key="InstallPreviewPageTemplate"><views:InstallPreviewView /></DataTemplate>
-    <DataTemplate x:Key="WorkflowsPageTemplate"><views:WorkflowsView /></DataTemplate>
-    <DataTemplate x:Key="ModelsPageTemplate"><views:ModelsView /></DataTemplate>
-    <DataTemplate x:Key="NodesPageTemplate"><views:NodesView /></DataTemplate>
+    <DataTemplate x:Key="LibraryPageTemplate"><views:LibraryView /></DataTemplate>
+    <DataTemplate x:Key="PackagingPageTemplate"><views:PackageWizardView /></DataTemplate>
+    <DataTemplate x:Key="InstallPageTemplate"><views:InstallView /></DataTemplate>
     <DataTemplate x:Key="TasksPageTemplate"><views:TasksView /></DataTemplate>
-    <DataTemplate x:Key="PackageWizardPageTemplate"><views:PackageWizardView /></DataTemplate>
-    <DataTemplate x:Key="AppearancePageTemplate"><views:AppearanceView /></DataTemplate>
+    <DataTemplate x:Key="SettingsPageTemplate"><views:SettingsView /></DataTemplate>
 
     <Style x:Key="NavButtonBase" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
       <Setter Property="MinHeight" Value="80" />
@@ -72,17 +65,25 @@
         </DataTrigger>
       </Style.Triggers>
     </Style>
-    <Style x:Key="PackagesNavButton" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
+    <Style x:Key="LibraryNavButton" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
       <Style.Triggers>
-        <DataTrigger Binding="{Binding IsPackagesContext}" Value="True">
+        <DataTrigger Binding="{Binding IsLibraryContext}" Value="True">
           <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
           <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
         </DataTrigger>
       </Style.Triggers>
     </Style>
-    <Style x:Key="WorkflowsNavButton" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
+    <Style x:Key="PackagingNavButton" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
       <Style.Triggers>
-        <DataTrigger Binding="{Binding IsWorkflowsContext}" Value="True">
+        <DataTrigger Binding="{Binding IsPackagingContext}" Value="True">
+          <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+          <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="InstallNavButton" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding IsInstallContext}" Value="True">
           <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
           <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
         </DataTrigger>
@@ -134,19 +135,23 @@
                     HorizontalAlignment="Center"
                     Panel.ZIndex="2"
                     automation:AutomationProperties.AutomationId="PrimaryNavigation">
-          <Button Content="首页"
-                  Style="{StaticResource HomeNavButton}"
+          <Button Content="{Binding Text[Nav.Home]}"
+                   Style="{StaticResource HomeNavButton}"
+                   Command="{Binding NavigateCommand}"
+                   CommandParameter="Home" />
+          <Button Content="{Binding Text[Nav.Library]}"
+                  Style="{StaticResource LibraryNavButton}"
                   Command="{Binding NavigateCommand}"
-                  CommandParameter="Home" />
-          <Button Content="资源包"
-                  Style="{StaticResource PackagesNavButton}"
+                  CommandParameter="Library" />
+          <Button Content="{Binding Text[Nav.Packaging]}"
+                  Style="{StaticResource PackagingNavButton}"
                   Command="{Binding NavigateCommand}"
-                  CommandParameter="Packages" />
-          <Button Content="工作流"
-                  Style="{StaticResource WorkflowsNavButton}"
+                  CommandParameter="Packaging" />
+          <Button Content="{Binding Text[Nav.Install]}"
+                  Style="{StaticResource InstallNavButton}"
                   Command="{Binding NavigateCommand}"
-                  CommandParameter="Workflows" />
-          <Button Content="任务"
+                  CommandParameter="Install" />
+          <Button Content="{Binding Text[Nav.Tasks]}"
                   Style="{StaticResource TasksNavButton}"
                   Command="{Binding NavigateCommand}"
                   CommandParameter="Tasks" />
@@ -169,11 +174,11 @@
           </Border>
           <Button Content="⚙"
                   Style="{StaticResource IconButton}"
-                  ToolTip="外观设置"
+                  ToolTip="{Binding Text[Nav.Settings]}"
                   FontSize="18"
-                  automation:AutomationProperties.Name="外观设置"
+                  automation:AutomationProperties.Name="{Binding Text[Nav.Settings]}"
                   Command="{Binding NavigateCommand}"
-                  CommandParameter="Appearance" />
+                  CommandParameter="Settings" />
         </StackPanel>
       </Grid>
     </Border>
@@ -190,14 +195,11 @@
           <Style TargetType="ContentControl">
             <Setter Property="ContentTemplate" Value="{StaticResource HomePageTemplate}" />
             <Style.Triggers>
-              <DataTrigger Binding="{Binding CurrentPage}" Value="Packages"><Setter Property="ContentTemplate" Value="{StaticResource PackagesPageTemplate}" /></DataTrigger>
-              <DataTrigger Binding="{Binding CurrentPage}" Value="InstallPreview"><Setter Property="ContentTemplate" Value="{StaticResource InstallPreviewPageTemplate}" /></DataTrigger>
-              <DataTrigger Binding="{Binding CurrentPage}" Value="Workflows"><Setter Property="ContentTemplate" Value="{StaticResource WorkflowsPageTemplate}" /></DataTrigger>
-              <DataTrigger Binding="{Binding CurrentPage}" Value="Models"><Setter Property="ContentTemplate" Value="{StaticResource ModelsPageTemplate}" /></DataTrigger>
-              <DataTrigger Binding="{Binding CurrentPage}" Value="Nodes"><Setter Property="ContentTemplate" Value="{StaticResource NodesPageTemplate}" /></DataTrigger>
+              <DataTrigger Binding="{Binding CurrentPage}" Value="Library"><Setter Property="ContentTemplate" Value="{StaticResource LibraryPageTemplate}" /></DataTrigger>
+              <DataTrigger Binding="{Binding CurrentPage}" Value="Packaging"><Setter Property="ContentTemplate" Value="{StaticResource PackagingPageTemplate}" /></DataTrigger>
+              <DataTrigger Binding="{Binding CurrentPage}" Value="Install"><Setter Property="ContentTemplate" Value="{StaticResource InstallPageTemplate}" /></DataTrigger>
               <DataTrigger Binding="{Binding CurrentPage}" Value="Tasks"><Setter Property="ContentTemplate" Value="{StaticResource TasksPageTemplate}" /></DataTrigger>
-              <DataTrigger Binding="{Binding CurrentPage}" Value="PackageWizard"><Setter Property="ContentTemplate" Value="{StaticResource PackageWizardPageTemplate}" /></DataTrigger>
-              <DataTrigger Binding="{Binding CurrentPage}" Value="Appearance"><Setter Property="ContentTemplate" Value="{StaticResource AppearancePageTemplate}" /></DataTrigger>
+              <DataTrigger Binding="{Binding CurrentPage}" Value="Settings"><Setter Property="ContentTemplate" Value="{StaticResource SettingsPageTemplate}" /></DataTrigger>
             </Style.Triggers>
           </Style>
         </ContentControl.Style>

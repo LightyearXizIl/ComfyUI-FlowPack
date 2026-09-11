@@ -4,12 +4,14 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
 using FlowPack.ComfyUI;
 using FlowPack.Core;
 using FlowPack.Infrastructure;
+using FlowPack.App.Services;
 using Microsoft.Win32;
 
 namespace FlowPack.App;
@@ -17,14 +19,11 @@ namespace FlowPack.App;
 public enum FlowPage
 {
     Home,
-    Packages,
-    InstallPreview,
-    Workflows,
-    Models,
-    Nodes,
+    Library,
+    Packaging,
+    Install,
     Tasks,
-    PackageWizard,
-    Appearance
+    Settings
 }
 
 public sealed record PackageRow(
@@ -59,6 +58,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged
     private ResourceLibraryDatabase? _libraryDatabase;
     private InstanceFingerprint? _candidateInstance;
     private readonly IComfyDesktopDetector? _desktopDetector;
+    private readonly ILocalizationService _localization;
+    private readonly IUpdateService _updateService;
     private ComfyDesktopLocation? _detectedDesktop;
     private InstallPlan? _installPlan;
     private ThemeDefinition _appliedTheme;
@@ -74,29 +75,54 @@ public sealed class ShellViewModel : INotifyPropertyChanged
     private string _nodeSearchText = string.Empty;
     private PackageDraft _packageDraft = CreateEmptyDraft();
     private string _wizardStatus = "请选择工作流开始创建草稿。";
+    private string _updateNotice;
 
-    public ShellViewModel() : this(null, null, null, null)
+    public ShellViewModel() : this(null, null, null, null, null, null)
     {
     }
 
     public ShellViewModel(
-        ThemePreferenceStore? themeStore,
+        ThemePreferenceStore? themeStore = null,
         LibraryBindingStore? libraryBindingStore = null,
         IInstanceInspector? instanceInspector = null,
-        IComfyDesktopDetector? desktopDetector = null)
+        IComfyDesktopDetector? desktopDetector = null,
+        ILocalizationService? localization = null,
+        IUpdateService? updateService = null)
     {
         _themeStore = themeStore ?? new ThemePreferenceStore();
         _libraryBindingStore = libraryBindingStore ?? new LibraryBindingStore();
         _instanceInspector = instanceInspector ?? new ComfyUiInspector();
         _desktopDetector = desktopDetector;
+        _localization = localization ?? new LocalizationService();
+        _updateService = updateService ?? new GitHubReleaseUpdateService(new HttpClient());
+        _updateNotice = _localization["Update.None"];
+        _localization.PropertyChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(Text));
+            OnPropertyChanged(nameof(PageTitle));
+            OnPropertyChanged(nameof(PageSubtitle));
+            OnPropertyChanged(nameof(LanguageOptions));
+        };
         _appliedTheme = LoadInitialTheme();
         _draftTheme = _appliedTheme;
         NavigateCommand = new RelayCommand(parameter =>
         {
-            if (Enum.TryParse<FlowPage>(parameter?.ToString(), out var page))
+            var route = parameter?.ToString();
+            if (Enum.TryParse<FlowPage>(route, out var page))
             {
                 CurrentPage = page;
+                return;
             }
+
+            // Legacy links inside existing views resolve into the new six-area shell.
+            CurrentPage = route switch
+            {
+                "Packages" or "InstallPreview" => FlowPage.Install,
+                "Workflows" or "Models" or "Nodes" => FlowPage.Library,
+                "PackageWizard" => FlowPage.Packaging,
+                "Appearance" => FlowPage.Settings,
+                _ => CurrentPage
+            };
         });
         OpenPackageCommand = new RelayCommand(OpenPackage, parameter => parameter is PackageRow);
         ToggleThemeCommand = new RelayCommand(_ => ToggleQuickTheme());
@@ -125,6 +151,15 @@ public sealed class ShellViewModel : INotifyPropertyChanged
         ExportDiagnosticsCommand = new RelayCommand(_ => _ = ExportDiagnosticsAsync());
         SelectResourceLibraryCommand = new RelayCommand(_ => _ = SelectResourceLibraryAsync());
         SelectComfyUiCommand = new RelayCommand(_ => _ = SelectComfyUiAsync());
+        SetLanguageCommand = new RelayCommand(parameter =>
+        {
+            if (Enum.TryParse<AppLanguage>(parameter?.ToString(), out var language))
+            {
+                _localization.SetLanguage(language);
+                OnPropertyChanged(nameof(SelectedLanguage));
+            }
+        });
+        CheckForUpdatesCommand = new RelayCommand(_ => _ = CheckForUpdatesAsync());
 
         PackageView = CollectionViewSource.GetDefaultView(Packages);
         WorkflowView = CollectionViewSource.GetDefaultView(Workflows);
@@ -178,6 +213,35 @@ public sealed class ShellViewModel : INotifyPropertyChanged
     public ICommand ExportDiagnosticsCommand { get; }
     public ICommand SelectResourceLibraryCommand { get; }
     public ICommand SelectComfyUiCommand { get; }
+    public ICommand SetLanguageCommand { get; }
+    public ICommand CheckForUpdatesCommand { get; }
+
+    public ILocalizationService Text => _localization;
+    public AppLanguage SelectedLanguage
+    {
+        get => _localization.Language;
+        set
+        {
+            _localization.SetLanguage(value);
+            OnPropertyChanged();
+        }
+    }
+    public IReadOnlyList<SettingOption<AppLanguage>> LanguageOptions =>
+    [
+        new(AppLanguage.System, Text["Language.System"]),
+        new(AppLanguage.ZhCn, Text["Language.ZhCn"]),
+        new(AppLanguage.EnUs, Text["Language.EnUs"])
+    ];
+    public string UpdateNotice
+    {
+        get => _updateNotice;
+        private set
+        {
+            if (_updateNotice == value) return;
+            _updateNotice = value;
+            OnPropertyChanged();
+        }
+    }
 
     public ObservableCollection<PackageRow> Packages { get; } = [];
     public ObservableCollection<TaskRow> Tasks { get; } = [];
@@ -225,8 +289,9 @@ public sealed class ShellViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(PageTitle));
             OnPropertyChanged(nameof(PageSubtitle));
             OnPropertyChanged(nameof(IsHomeContext));
-            OnPropertyChanged(nameof(IsPackagesContext));
-            OnPropertyChanged(nameof(IsWorkflowsContext));
+            OnPropertyChanged(nameof(IsLibraryContext));
+            OnPropertyChanged(nameof(IsPackagingContext));
+            OnPropertyChanged(nameof(IsInstallContext));
             OnPropertyChanged(nameof(IsTasksContext));
         }
     }
@@ -255,6 +320,30 @@ public sealed class ShellViewModel : INotifyPropertyChanged
             if (_statusNotice == value) return;
             _statusNotice = value;
             OnPropertyChanged();
+        }
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        try
+        {
+            var current = typeof(ShellViewModel).Assembly.GetName().Version ?? new Version(0, 0, 0);
+            var update = await _updateService.CheckAsync(new Version(current.Major, current.Minor, Math.Max(0, current.Build)), CancellationToken.None);
+            UpdateNotice = update is null
+                ? Text["Update.Latest"]
+                : $"{Text["Update.Available"]} v{update.Version}（SHA-256 已验证后才能下载）。";
+        }
+        catch (HttpRequestException)
+        {
+            UpdateNotice = Text["Update.Failed"];
+        }
+        catch (TaskCanceledException)
+        {
+            UpdateNotice = Text["Update.Failed"];
+        }
+        catch (JsonException)
+        {
+            UpdateNotice = Text["Update.Failed"];
         }
     }
 
@@ -320,8 +409,9 @@ public sealed class ShellViewModel : INotifyPropertyChanged
     }
 
     public bool IsHomeContext => CurrentPage == FlowPage.Home;
-    public bool IsPackagesContext => CurrentPage is FlowPage.Packages or FlowPage.InstallPreview or FlowPage.Models or FlowPage.Nodes;
-    public bool IsWorkflowsContext => CurrentPage is FlowPage.Workflows or FlowPage.PackageWizard;
+    public bool IsLibraryContext => CurrentPage == FlowPage.Library;
+    public bool IsPackagingContext => CurrentPage == FlowPage.Packaging;
+    public bool IsInstallContext => CurrentPage == FlowPage.Install;
     public bool IsTasksContext => CurrentPage == FlowPage.Tasks;
 
     public IReadOnlyList<SettingOption<ThemeBase>> ThemeBaseOptions { get; } =
@@ -505,29 +595,23 @@ public sealed class ShellViewModel : INotifyPropertyChanged
 
     public string PageTitle => CurrentPage switch
     {
-        FlowPage.Home => "让 ComfyUI 资源井然有序",
-        FlowPage.Packages => "资源包",
-        FlowPage.InstallPreview => "安装预览",
-        FlowPage.Workflows => "工作流",
-        FlowPage.Models => "模型库",
-        FlowPage.Nodes => "节点管理",
-        FlowPage.Tasks => "任务中心",
-        FlowPage.PackageWizard => "创建资源包",
-        FlowPage.Appearance => "外观设置",
+        FlowPage.Home => Text["Page.Home.Title"],
+        FlowPage.Library => Text["Page.Library.Title"],
+        FlowPage.Packaging => Text["Page.Packaging.Title"],
+        FlowPage.Install => Text["Page.Install.Title"],
+        FlowPage.Tasks => Text["Page.Tasks.Title"],
+        FlowPage.Settings => Text["Page.Settings.Title"],
         _ => string.Empty
     };
 
     public string PageSubtitle => CurrentPage switch
     {
-        FlowPage.Home => "导入、安装和分享工作流需要的全部资源。",
-        FlowPage.Packages => "查看资源包的版本、状态和兼容性。",
-        FlowPage.InstallPreview => "确认真实环境检查和变更计划后才能安装。",
-        FlowPage.Workflows => "从资源库管理工作流与所需依赖。",
-        FlowPage.Models => "模型集中保存，并按 ComfyUI 实例共享加载。",
-        FlowPage.Nodes => "只维护 FlowPack 已识别的自定义节点。",
-        FlowPage.Tasks => "这里显示真实下载和安装任务，不生成示例进度。",
-        FlowPage.PackageWizard => "固定四步创建一个可分享的资源包。",
-        FlowPage.Appearance => "调整界面外观，页面与任务状态保持不变。",
+        FlowPage.Home => Text["Page.Home.Subtitle"],
+        FlowPage.Library => Text["Page.Library.Subtitle"],
+        FlowPage.Packaging => Text["Page.Packaging.Subtitle"],
+        FlowPage.Install => Text["Page.Install.Subtitle"],
+        FlowPage.Tasks => Text["Page.Tasks.Subtitle"],
+        FlowPage.Settings => Text["Page.Settings.Subtitle"],
         _ => string.Empty
     };
 
@@ -549,7 +633,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged
     {
         if (parameter is not PackageRow package) return;
         SelectedPackage = package;
-        CurrentPage = FlowPage.InstallPreview;
+        CurrentPage = FlowPage.Install;
     }
 
     private void RestoreLibraryBinding()
@@ -706,7 +790,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged
         if (_libraryDatabase is null)
         {
             MessageBox.Show("请先在设置页选择资源库。任务中心只读取资源库中由 Worker 持久化的真实任务。", "需要资源库", MessageBoxButton.OK, MessageBoxImage.Information);
-            CurrentPage = FlowPage.Appearance;
+            CurrentPage = FlowPage.Settings;
             return;
         }
         try
@@ -1037,7 +1121,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged
             _packageDraft = exchange.Draft;
             RaiseDraftProperties();
             await RestoreWorkflowsAsync();
-            CurrentPage = FlowPage.PackageWizard;
+            CurrentPage = FlowPage.Packaging;
             WizardStatus = "草稿已导入并保存到资源库；它不是可安装资源包，仍不包含已分析依赖或资源载荷。";
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
@@ -1404,7 +1488,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged
         if (_libraryDatabase is null)
         {
             MessageBox.Show("请先在设置页选择资源库。资源包不会只保存在当前会话中。", "需要资源库", MessageBoxButton.OK, MessageBoxImage.Information);
-            CurrentPage = FlowPage.Appearance;
+            CurrentPage = FlowPage.Settings;
             return;
         }
 
@@ -1417,7 +1501,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged
                 await _libraryDatabase.SaveWorkflowAsync(workflow, $"资源包：{imported.Source}");
             }
             await RestorePackagesAsync();
-            CurrentPage = FlowPage.Packages;
+            CurrentPage = FlowPage.Install;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
         {
@@ -1430,7 +1514,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged
         if (_libraryDatabase is null)
         {
             MessageBox.Show("请先在设置页选择资源库。工作流不会只保存在当前会话中。", "需要资源库", MessageBoxButton.OK, MessageBoxImage.Information);
-            CurrentPage = FlowPage.Appearance;
+            CurrentPage = FlowPage.Settings;
             return;
         }
 
@@ -1446,7 +1530,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged
             var workflow = await new WorkflowReader().ReadAsync(dialog.FileName);
             await _libraryDatabase.SaveWorkflowAsync(workflow, dialog.FileName);
             await RestoreWorkflowsAsync();
-            CurrentPage = FlowPage.Workflows;
+            CurrentPage = FlowPage.Library;
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or System.Text.Json.JsonException)
         {

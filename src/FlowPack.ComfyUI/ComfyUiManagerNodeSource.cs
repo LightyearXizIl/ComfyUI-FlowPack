@@ -86,7 +86,7 @@ public sealed class ComfyUiManagerNodeSource : INodeSourceProvider, ICustomNodeR
         if (string.IsNullOrWhiteSpace(nodeType)) return null;
         var entries = GetEntriesAsync(CancellationToken.None).GetAwaiter().GetResult();
         var normalized = Normalize(nodeType);
-        var match = _entries.FirstOrDefault(e =>
+        var match = entries.FirstOrDefault(e =>
             (e.Title is not null && Normalize(e.Title) == normalized) ||
             (e.RepoName is not null && Normalize(e.RepoName) == normalized));
         return match?.RepositoryUrl is not null ? FolderFromUrl(match.RepositoryUrl) : null;

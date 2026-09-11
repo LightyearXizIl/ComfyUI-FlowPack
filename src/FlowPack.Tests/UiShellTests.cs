@@ -40,7 +40,7 @@ public sealed class UiShellTests
                         AutomationProperties.GetAutomationId(element) == $"Page.{page}");
                 }
 
-                viewModel.CurrentPage = FlowPage.Appearance;
+                viewModel.CurrentPage = FlowPage.Settings;
                 pageHost.UpdateLayout();
                 Assert.Contains(Descendants(pageHost).OfType<Button>(), button =>
                     AutomationProperties.GetName(button) == "打开 LightyearXizIl 的 GitHub 仓库");
@@ -51,7 +51,7 @@ public sealed class UiShellTests
                 Assert.Contains(Descendants(pageHost).OfType<Button>(), button =>
                     AutomationProperties.GetName(button) == "导出脱敏诊断摘要");
 
-                viewModel.CurrentPage = FlowPage.PackageWizard;
+                viewModel.CurrentPage = FlowPage.Packaging;
                 pageHost.UpdateLayout();
                 Assert.Contains(Descendants(pageHost).OfType<Button>(), button =>
                     AutomationProperties.GetName(button) == "导入资源包草稿");

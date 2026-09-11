@@ -1,5 +1,5 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "0.0.1"
+  #define MyAppVersion "0.1.0"
 #endif
 
 #define MyAppName "ComfyUI FlowPack"
@@ -13,6 +13,9 @@ AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 DefaultDirName={localappdata}\Programs\ComfyUI FlowPack
+DisableDirPage=no
+UsePreviousAppDir=yes
+UsePreviousLanguage=yes
 DefaultGroupName=ComfyUI FlowPack
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
@@ -35,9 +38,14 @@ VersionInfoDescription={#MyAppName} Windows installer
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "chinesesimplified"; MessagesFile: "compiler:Default.isl,Languages\ChineseSimplified.isl"
+
+[CustomMessages]
+DesktopIcon=Create a desktop shortcut
+OtherTasks=Additional tasks:
 
 [Tasks]
-Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "其他任务："; Flags: unchecked
+Name: "desktopicon"; Description: "{cm:DesktopIcon}"; GroupDescription: "{cm:OtherTasks}"; Flags: unchecked
 
 [Files]
 Source: "..\artifacts\publish\app\*"; DestDir: "{app}"; Excludes: "*.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs

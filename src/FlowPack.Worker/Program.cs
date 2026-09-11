@@ -74,6 +74,8 @@ static async Task<WorkerResponse> HandleRequestAsync(
             startedAtUtc = startedAt,
             stagingWritesEnabled = libraryDatabase is not null,
             deploymentWritesEnabled = false,
+            installPlanningEnabled = libraryDatabase is not null,
+            verificationWritesEnabled = false,
             taskStoreAttached = libraryDatabase is not null,
             taskCount
         }));
@@ -92,6 +94,13 @@ static async Task<WorkerResponse> HandleRequestAsync(
     if (request.Command == WorkerProtocol.DownloadCommand)
     {
         return await DownloadAsync(request, libraryDatabase, cancellationToken);
+    }
+
+    if (request.Command == WorkerProtocol.CreateInstallPlanCommand || request.Command == WorkerProtocol.VerifyCommand)
+    {
+        return new WorkerResponse(request.RequestId, false, null, new WorkerError(
+            "safety-gate-not-met",
+            "该命令已保留在 Worker 边界内，但隔离 Desktop 实机验收和 journal 恢复验证尚未完成，拒绝执行。"));
     }
 
     return new WorkerResponse(request.RequestId, false, null, new WorkerError("unsupported-command", "当前 Worker 尚未实现该命令。"));

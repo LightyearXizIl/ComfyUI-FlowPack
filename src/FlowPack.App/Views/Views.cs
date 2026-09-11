@@ -11,3 +11,6 @@ public partial class NodesView : UserControl { public NodesView() => InitializeC
 public partial class TasksView : UserControl { public TasksView() => InitializeComponent(); }
 public partial class PackageWizardView : UserControl { public PackageWizardView() => InitializeComponent(); }
 public partial class AppearanceView : UserControl { public AppearanceView() => InitializeComponent(); }
+public partial class LibraryView : UserControl { public LibraryView() => InitializeComponent(); }
+public partial class InstallView : UserControl { public InstallView() => InitializeComponent(); }
+public partial class SettingsView : UserControl { public SettingsView() => InitializeComponent(); }
