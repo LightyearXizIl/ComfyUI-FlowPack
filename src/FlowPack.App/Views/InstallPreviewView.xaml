@@ -13,7 +13,10 @@
         <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" Margin="0,10,0,0" />
         <TextBlock Text="{Binding SelectedPackageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
       </StackPanel>
-      <Button Grid.Column="1" Content="开始安装" Style="{StaticResource PrimaryButton}" VerticalAlignment="Bottom" IsEnabled="False" Command="{Binding StartInstallCommand}" ToolTip="选择并检查真实 ComfyUI 环境后才能生成安装计划" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+        <Button Content="{Binding DownloadPackageButtonText}" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Command="{Binding DownloadPackageCommand}" IsEnabled="{Binding HasDownloadablePackage}" ToolTip="仅下载并校验，不部署到 ComfyUI；需要每项资源都有来源和 SHA-256" />
+        <Button Content="开始安装" Style="{StaticResource PrimaryButton}" IsEnabled="False" Command="{Binding StartInstallCommand}" ToolTip="选择并检查真实 ComfyUI 环境后才能生成安装计划" />
+      </StackPanel>
     </Grid>
 
     <Border Grid.Row="2">
@@ -37,15 +40,15 @@
       <Border Style="{StaticResource Card}">
         <StackPanel>
           <TextBlock Text="环境检查" Style="{StaticResource SectionTitle}" />
-          <TextBlock Text="●  尚未检查" Foreground="{DynamicResource WarningBrush}" FontWeight="SemiBold" Margin="0,14,0,8" />
-          <TextBlock Text="当前没有目标实例指纹、Python 路径或资源库信息，FlowPack 不会据此生成安装计划。" Style="{StaticResource SubtleText}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding InstallPreviewEnvironment}" Foreground="{DynamicResource WarningBrush}" FontWeight="SemiBold" Margin="0,14,0,8" />
+          <TextBlock Text="{Binding InstallPreviewStatus}" Style="{StaticResource SubtleText}" TextWrapping="Wrap" />
         </StackPanel>
       </Border>
       <Border Grid.Column="2" Style="{StaticResource Card}">
         <StackPanel>
           <TextBlock Text="清单内容" Style="{StaticResource SectionTitle}" />
           <TextBlock Text="{Binding SelectedPackageResourceSummary}" Margin="0,14,0,8" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" />
-          <TextBlock Text="这里只展示清单声明；复用、下载、部署和空间结论必须等待真实环境检查。" Style="{StaticResource SubtleText}" TextWrapping="Wrap" />
+          <TextBlock Text="清单完整时会生成下载/阻断声明；复用、部署和空间结论必须等待真实环境检查。" Style="{StaticResource SubtleText}" TextWrapping="Wrap" />
         </StackPanel>
       </Border>
     </Grid>
@@ -58,7 +61,21 @@
         </Style>
       </Border.Style>
       <StackPanel>
-        <TextBlock Text="资源声明" Style="{StaticResource SectionTitle}" />
+        <TextBlock Text="声明级计划动作" Style="{StaticResource SectionTitle}" />
+        <TextBlock Text="{Binding InstallPreviewStatus}" Style="{StaticResource SubtleText}" Margin="0,7,0,10" TextWrapping="Wrap" />
+        <ItemsControl ItemsSource="{Binding InstallPreviewActions}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Grid Margin="0,5">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="*" /><ColumnDefinition Width="100" /></Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding Kind}" Foreground="{DynamicResource MutedBrush}" />
+                <TextBlock Grid.Column="1" Text="{Binding Summary}" Foreground="{DynamicResource TextBrush}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="2" Text="{Binding RequiredSize}" Style="{StaticResource SubtleText}" HorizontalAlignment="Right" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="资源声明" Style="{StaticResource SectionTitle}" Margin="0,18,0,0" />
         <ItemsControl ItemsSource="{Binding SelectedPackage.Resources}" Margin="0,12,0,0">
           <ItemsControl.ItemTemplate>
             <DataTemplate>

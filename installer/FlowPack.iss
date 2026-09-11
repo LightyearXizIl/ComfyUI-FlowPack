@@ -3,7 +3,7 @@
 #endif
 
 #define MyAppName "ComfyUI FlowPack"
-#define MyAppPublisher "FlowPack"
+#define MyAppPublisher "LightyearXizIl"
 #define MyAppExeName "ComfyUI.FlowPack.exe"
 
 [Setup]

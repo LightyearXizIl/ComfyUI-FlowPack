@@ -3,22 +3,92 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              AutomationProperties.AutomationId="Page.PackageWizard">
   <Grid>
-    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="28" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="28" /><RowDefinition Height="*" /></Grid.RowDefinitions>
     <Grid>
       <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
       <StackPanel>
         <Button Content="← 返回工作流" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AccentBrush}" Padding="0" HorizontalAlignment="Left" Cursor="Hand" Command="{Binding NavigateCommand}" CommandParameter="Workflows" />
         <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" Margin="0,10,0,0" />
-        <TextBlock Text="第 1 步，共 4 步：选择工作流。" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
+        <TextBlock Text="{Binding WizardStepText}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
       </StackPanel>
-      <Button Grid.Column="1" Content="下一步" Style="{StaticResource PrimaryButton}" VerticalAlignment="Bottom" IsEnabled="False" ToolTip="先选择有效工作流" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
+        <Button Content="导入草稿" Style="{StaticResource SecondaryButton}" Command="{Binding ImportDraftCommand}" Margin="0,0,10,0" AutomationProperties.Name="导入资源包草稿" />
+        <Button Content="上一步" Style="{StaticResource SecondaryButton}" Command="{Binding PreviousWizardStepCommand}" Margin="0,0,10,0" />
+        <Button Content="下一步" Style="{StaticResource PrimaryButton}" Command="{Binding NextWizardStepCommand}" />
+      </StackPanel>
     </Grid>
-    <Border Grid.Row="2" Style="{StaticResource Card}">
-      <StackPanel>
-        <TextBlock Text="选择一个工作流" Style="{StaticResource SectionTitle}" />
-        <TextBlock Text="FlowPack 会保留未知字段；在解析与草稿持久化功能接入前，不会伪造依赖结果。" Style="{StaticResource SubtleText}" Margin="0,7,0,18" TextWrapping="Wrap" />
-        <Button Content="选择工作流文件" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" IsEnabled="False" ToolTip="工作流解析功能接入后开放" />
-      </StackPanel>
-    </Border>
+    <Grid Grid.Row="2">
+      <Border>
+        <Border.Style>
+          <Style TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers><DataTrigger Binding="{Binding WizardStep}" Value="1"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
+          </Style>
+        </Border.Style>
+        <StackPanel>
+          <TextBlock Text="1. 选择工作流" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="选择资源库中已导入的工作流。原始 JSON 会保持不变。" Style="{StaticResource SubtleText}" Margin="0,8,0,16" />
+          <ComboBox ItemsSource="{Binding Workflows}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding DraftWorkflowId, Mode=TwoWay}" AutomationProperties.Name="资源包草稿工作流" />
+        </StackPanel>
+      </Border>
+      <Border>
+        <Border.Style>
+          <Style TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers><DataTrigger Binding="{Binding WizardStep}" Value="2"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
+          </Style>
+        </Border.Style>
+        <StackPanel>
+          <TextBlock Text="2. 检查依赖" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="工作流已保存，但自动依赖分析、节点 Registry 与本地实例核对尚未完成。当前可保存草稿，不能把它标记为完整资源包或直接安装。" Style="{StaticResource SubtleText}" Margin="0,8,0,0" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+      <Border>
+        <Border.Style>
+          <Style TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers><DataTrigger Binding="{Binding WizardStep}" Value="3"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
+          </Style>
+        </Border.Style>
+        <Grid>
+          <Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+          <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+          <TextBlock Text="资源包名称" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+          <TextBox Grid.Column="1" Text="{Binding DraftName, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Grid.Row="2" Text="版本" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+          <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding DraftVersion, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Grid.Row="4" Text="作者" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+          <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding DraftAuthorName, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Grid.Row="6" Text="作者网址" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+          <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding DraftAuthorUrl, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Grid.Row="8" Text="来源" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+          <TextBox Grid.Row="8" Grid.Column="1" Text="{Binding DraftSource, UpdateSourceTrigger=PropertyChanged}" ToolTip="必须是不含凭据的 HTTPS 地址" />
+          <TextBlock Grid.Row="10" Text="分发方式" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+          <ComboBox Grid.Row="10" Grid.Column="1" ItemsSource="{Binding DraftDistributionOptions}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding DraftDistribution, Mode=TwoWay}" />
+          <TextBlock Grid.Row="12" Text="说明" VerticalAlignment="Top" Foreground="{DynamicResource TextBrush}" />
+          <TextBox Grid.Row="12" Grid.Column="1" Text="{Binding DraftDescription, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="72" />
+        </Grid>
+      </Border>
+      <Border>
+        <Border.Style>
+          <Style TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers><DataTrigger Binding="{Binding WizardStep}" Value="4"><Setter Property="Visibility" Value="Visible" /></DataTrigger></Style.Triggers>
+          </Style>
+        </Border.Style>
+        <StackPanel>
+          <TextBlock Text="4. 保存草稿" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="当前草稿会持久化保存。可以导出包含原始工作流、尺寸和 SHA-256 的不完整离线包；依赖、节点、模型与素材尚未分析或收集，因此该包不能被标记为完整或直接安装。" Style="{StaticResource SubtleText}" Margin="0,8,0,18" TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal">
+            <Button Content="保存草稿" Style="{StaticResource PrimaryButton}" Margin="0,0,10,0" Command="{Binding SaveWizardDraftCommand}" />
+            <Button Content="导出草稿" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Command="{Binding ExportDraftCommand}" />
+            <Button Content="导出工作流包（不完整）" Style="{StaticResource SecondaryButton}" Command="{Binding ExportWorkflowPackageCommand}" AutomationProperties.Name="导出不完整工作流资源包" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+      <Border Background="{DynamicResource WarningSoftBrush}" CornerRadius="{DynamicResource ControlCornerRadius}" Padding="12" VerticalAlignment="Bottom" Margin="0,18,0,0">
+        <TextBlock Text="{Binding WizardStatus, Mode=OneWay}" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" />
+      </Border>
+    </Grid>
   </Grid>
 </UserControl>

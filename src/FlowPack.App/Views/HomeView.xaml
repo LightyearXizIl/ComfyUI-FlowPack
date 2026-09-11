@@ -18,7 +18,8 @@
         <TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
       </StackPanel>
       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-        <Button Content="导入资源包" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Command="{Binding ImportPackageCommand}" />
+        <Button Content="导入资源包文件" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Command="{Binding ImportPackageCommand}" />
+        <Button Content="导入已展开目录" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Command="{Binding ImportPackageFolderCommand}" />
         <Button Content="创建资源包" Style="{StaticResource PrimaryButton}" Command="{Binding NavigateCommand}" CommandParameter="PackageWizard" />
       </StackPanel>
     </Grid>
@@ -28,19 +29,19 @@
       <Border Style="{StaticResource Card}">
         <StackPanel>
           <TextBlock Text="当前 ComfyUI 环境" Style="{StaticResource SectionTitle}" />
-          <TextBlock Text="尚未选择或检查 ComfyUI Desktop 实例" Style="{StaticResource SubtleText}" Margin="0,8,0,18" />
+          <TextBlock Text="{Binding ComfyUiLocation, Mode=OneWay}" Style="{StaticResource SubtleText}" Margin="0,8,0,18" TextWrapping="Wrap" />
           <Border Background="{DynamicResource WarningSoftBrush}" CornerRadius="7" Padding="12">
             <StackPanel>
               <TextBlock Text="●  尚未检查" Foreground="{DynamicResource WarningBrush}" FontWeight="SemiBold" />
               <TextBlock Text="FlowPack 尚未读取本机环境，因此不会显示已连接或已就绪。" Style="{StaticResource SubtleText}" Margin="0,4,0,0" TextWrapping="Wrap" />
             </StackPanel>
           </Border>
-          <Button Content="选择 ComfyUI 环境"
+          <Button Content="选择候选 ComfyUI 环境"
                   Style="{StaticResource SecondaryButton}"
                   HorizontalAlignment="Left"
                   Margin="0,18,0,0"
-                  IsEnabled="False"
-                  ToolTip="环境发现与绑定将在实例适配功能接入后开放" />
+                  Command="{Binding SelectComfyUiCommand}"
+                  ToolTip="只读检查候选目录，不会写入 ComfyUI" />
         </StackPanel>
       </Border>
 

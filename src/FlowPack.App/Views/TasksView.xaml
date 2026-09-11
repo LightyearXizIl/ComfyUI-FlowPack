@@ -4,10 +4,14 @@
              AutomationProperties.AutomationId="Page.Tasks">
   <Grid>
     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="28" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-    <StackPanel>
-      <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" />
-      <TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
-    </StackPanel>
+    <Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+      <StackPanel>
+        <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" />
+        <TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
+      </StackPanel>
+      <Button Grid.Column="1" Content="刷新任务" Style="{StaticResource SecondaryButton}" VerticalAlignment="Center" Command="{Binding RefreshTasksCommand}" />
+    </Grid>
     <Grid Grid.Row="2">
       <Border>
         <Border.Style>
@@ -18,7 +22,10 @@
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
           <TextBlock Text="暂无任务" Style="{StaticResource SectionTitle}" HorizontalAlignment="Center" />
           <TextBlock Text="只有 Worker 返回的真实下载、校验或安装任务才会显示在这里。" Style="{StaticResource SubtleText}" Margin="0,7,0,18" />
-          <Button Content="查看资源包" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Center" Command="{Binding NavigateCommand}" CommandParameter="Packages" />
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button Content="刷新任务" Style="{StaticResource PrimaryButton}" Margin="0,0,10,0" Command="{Binding RefreshTasksCommand}" />
+            <Button Content="查看资源包" Style="{StaticResource SecondaryButton}" Command="{Binding NavigateCommand}" CommandParameter="Packages" />
+          </StackPanel>
         </StackPanel>
       </Border>
       <ItemsControl ItemsSource="{Binding Tasks}">
@@ -30,10 +37,18 @@
                 <StackPanel>
                   <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
                   <TextBlock Text="{Binding Stage}" Style="{StaticResource SubtleText}" Margin="0,5,0,10" />
-                  <ProgressBar Value="{Binding Progress}" Maximum="100" Height="6" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource AccentSoftBrush}" BorderThickness="0" />
+                  <ProgressBar Value="{Binding Progress}" Maximum="100" Height="6" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource AccentSoftBrush}" BorderThickness="0">
+                    <ProgressBar.Style>
+                      <Style TargetType="ProgressBar"><Setter Property="Visibility" Value="Visible" /><Style.Triggers><DataTrigger Binding="{Binding Progress}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style>
+                    </ProgressBar.Style>
+                  </ProgressBar>
                   <TextBlock Text="{Binding Detail}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
                 </StackPanel>
-                <TextBlock Grid.Column="1" Text="{Binding Progress, StringFormat={}{0}%}" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                <TextBlock Grid.Column="1" Text="{Binding Progress, StringFormat={}{0}%}" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" HorizontalAlignment="Right">
+                  <TextBlock.Style>
+                    <Style TargetType="TextBlock"><Setter Property="Visibility" Value="Visible" /><Style.Triggers><DataTrigger Binding="{Binding Progress}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers></Style>
+                  </TextBlock.Style>
+                </TextBlock>
               </Grid>
             </Border>
           </DataTemplate>

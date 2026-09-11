@@ -17,6 +17,14 @@ public sealed record ThemeDefinition(
     ThemeDensity Density,
     bool EnableAnimations);
 
+public static class ThemeDefaults
+{
+    public static ThemeDefinition Create(ThemeBase themeBase = ThemeBase.System) =>
+        themeBase == ThemeBase.Dark
+            ? new ThemeDefinition("1", "深色", themeBase, "#5A9BFF", "#19253A", "#F1F6FF", 14, 12, ThemeDensity.Comfortable, true)
+            : new ThemeDefinition("1", themeBase == ThemeBase.Light ? "浅色" : "跟随系统", themeBase, "#1E63D6", "#F9F7F2", "#12233D", 14, 12, ThemeDensity.Comfortable, true);
+}
+
 public sealed record ThemeValidationResult(bool IsValid, IReadOnlyList<string> Errors)
 {
     public static ThemeValidationResult Success { get; } = new(true, []);
@@ -41,7 +49,7 @@ public static class ThemeValidator
     private static bool TryReadColor(string value, out (byte R, byte G, byte B) color)
     {
         color = default;
-        if (value.Length != 7 || value[0] != '#') return false;
+        if (string.IsNullOrWhiteSpace(value) || value.Length != 7 || value[0] != '#') return false;
         if (!byte.TryParse(value.AsSpan(1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var r) ||
             !byte.TryParse(value.AsSpan(3, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var g) ||
             !byte.TryParse(value.AsSpan(5, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var b)) return false;

@@ -40,6 +40,24 @@ public sealed class UiShellTests
                         AutomationProperties.GetAutomationId(element) == $"Page.{page}");
                 }
 
+                viewModel.CurrentPage = FlowPage.Appearance;
+                pageHost.UpdateLayout();
+                Assert.Contains(Descendants(pageHost).OfType<Button>(), button =>
+                    AutomationProperties.GetName(button) == "打开 LightyearXizIl 的 GitHub 仓库");
+                Assert.Contains(Descendants(pageHost).OfType<Button>(), button =>
+                    AutomationProperties.GetName(button) == "复制 LightyearXizIl 的 GitHub 仓库链接");
+                Assert.Contains(Descendants(pageHost).OfType<Button>(), button =>
+                    AutomationProperties.GetName(button) == "选择资源库");
+                Assert.Contains(Descendants(pageHost).OfType<Button>(), button =>
+                    AutomationProperties.GetName(button) == "导出脱敏诊断摘要");
+
+                viewModel.CurrentPage = FlowPage.PackageWizard;
+                pageHost.UpdateLayout();
+                Assert.Contains(Descendants(pageHost).OfType<Button>(), button =>
+                    AutomationProperties.GetName(button) == "导入资源包草稿");
+                Assert.Contains(Descendants(pageHost).OfType<Button>(), button =>
+                    AutomationProperties.GetName(button) == "导出不完整工作流资源包");
+
                 foreach (var size in new[] { (Width: 960d, Height: 640d), (Width: 1280d, Height: 800d), (Width: 1600d, Height: 1000d) })
                 {
                     window.Width = size.Width;

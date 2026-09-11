@@ -2,17 +2,18 @@
 
 ComfyUI FlowPack 是面向 Windows x64 与官方 ComfyUI Desktop 的工作流资源安装和打包工具。
 
-## 0.0.1 状态
+## 0.0.2 状态
 
-`0.0.1` 是首个工程预览版，目前完成了：
+`0.0.2` 是工程预览版，目前完成了：
 
 - WPF 桌面壳层及九个独立页面 View；
-- 首页、资源包、工作流、任务和设置导航；
-- 资源包下模型库、节点管理二级入口；
-- 正式启动空状态，不加载虚假连接、资源或下载进度；
+- 作者 LightyearXizIl、GitHub 仓库和脱敏诊断摘要导出；
+- 资源库 SQLite 持久化、主题配置、Worker IPC 和 SHA-256 校验的 staging 下载；
+- `.cpack`/展开目录导入、工作流原文保留、草稿交换及不完整工作流包导出；
+- 资源包、工作流、模型与节点列表筛选，以及真实持久化任务显示；
 - Debug/Release 自动化测试、锁定 SDK/依赖和 Windows 安装器构建链路。
 
-ComfyUI 实例绑定、资源库持久化、Worker 下载、真实安装、离线资源包、试运行、维护和恢复功能仍在后续阶段实现。当前版本不能用于向真实 ComfyUI 环境部署资源。
+真实 ComfyUI Desktop 绑定、部署、恢复、离线完整包、试运行和安装生命周期仍待实机验证。安装入口保持禁用，当前版本不能用于向真实 ComfyUI 环境部署资源。
 
 ## 构建
 
@@ -25,7 +26,7 @@ ComfyUI 实例绑定、资源库持久化、Worker 下载、真实安装、离�
 ```powershell
 dotnet restore .\FlowPack.sln --locked-mode
 dotnet test .\FlowPack.sln -c Release --no-restore
-.\build\Build-Release.ps1 -Version 0.0.1
+.\build\Build-Release.ps1 -Version 0.0.2
 ```
 
 安装器输出到 `artifacts/installer/`。
@@ -39,4 +40,4 @@ dotnet test .\FlowPack.sln -c Release --no-restore
 
 ## 已知限制
 
-0.0.1 只验证当前工程壳层和安装器生命周期。真实 ComfyUI Desktop、Python、模型、节点、下载和离线安装尚未完成验证。安装包未进行代码签名，Windows 可能显示未知发布者提示。
+0.0.2 已验证本机自动化、Worker IPC 和安装器构建链路；真实 ComfyUI Desktop、Python、模型、节点和离线安装仍未完成实机验证。安装包未进行代码签名，Windows 可能显示未知发布者提示。

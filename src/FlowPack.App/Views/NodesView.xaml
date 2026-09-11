@@ -3,14 +3,42 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              AutomationProperties.AutomationId="Page.Nodes">
   <Grid>
-    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="28" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="16" /><RowDefinition Height="Auto" /><RowDefinition Height="18" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
     <StackPanel>
       <Button Content="← 返回资源包" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AccentBrush}" Padding="0" HorizontalAlignment="Left" Cursor="Hand" Command="{Binding NavigateCommand}" CommandParameter="Packages" />
       <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" Margin="0,10,0,0" />
       <TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
     </StackPanel>
-    <Border Grid.Row="2" Style="{StaticResource EmptyStateCard}">
-      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><TextBlock Text="尚未读取节点清单" Style="{StaticResource SectionTitle}" /><TextBlock Text="绑定环境后，这里才会显示实际来源、版本和兼容状态。" Style="{StaticResource SubtleText}" Margin="0,7,0,0" /></StackPanel>
-    </Border>
+    <TextBox Grid.Row="2" Text="{Binding NodeSearchText, UpdateSourceTrigger=PropertyChanged}" ToolTip="按节点、资源包、版本或状态搜索" AutomationProperties.Name="搜索节点" />
+    <Grid Grid.Row="4">
+      <Border>
+        <Border.Style>
+          <Style TargetType="Border" BasedOn="{StaticResource EmptyStateCard}">
+            <Style.Triggers><DataTrigger Binding="{Binding HasNodes}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
+          </Style>
+        </Border.Style>
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><TextBlock Text="尚未导入自定义节点清单" Style="{StaticResource SectionTitle}" /><TextBlock Text="导入包含节点声明的资源包后，这里会列出来源；兼容和加载状态仍需环境验证。" Style="{StaticResource SubtleText}" TextAlignment="Center" Margin="0,7,0,0" /></StackPanel>
+      </Border>
+      <ItemsControl ItemsSource="{Binding NodeView}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="180" /></Grid.ColumnDefinitions>
+                <StackPanel>
+                  <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
+                  <TextBlock Text="{Binding PackageName, StringFormat=来自资源包：{0}}" Style="{StaticResource SubtleText}" Margin="0,5,0,0" />
+                  <TextBlock Text="{Binding Status}" Style="{StaticResource SubtleText}" Margin="0,4,0,0" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                  <TextBlock Text="{Binding PackageVersion, StringFormat=v{0}}" Style="{StaticResource SubtleText}" HorizontalAlignment="Right" />
+                  <TextBlock Text="{Binding Size}" Foreground="{DynamicResource TextBrush}" HorizontalAlignment="Right" Margin="0,4,0,0" />
+                </StackPanel>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Grid>
   </Grid>
 </UserControl>

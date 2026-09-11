@@ -3,30 +3,120 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              AutomationProperties.AutomationId="Page.Appearance">
   <Grid>
-    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="28" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="28" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="20" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
     <Grid>
       <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-      <StackPanel><TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" /><TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" /></StackPanel>
-      <Button Grid.Column="1" Content="切换明暗主题" Style="{StaticResource PrimaryButton}" VerticalAlignment="Center" Command="{Binding ToggleThemeCommand}" />
+      <StackPanel>
+        <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" />
+        <TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
+      </StackPanel>
+      <Button Grid.Column="1" Content="应用并保存" Style="{StaticResource PrimaryButton}" VerticalAlignment="Center"
+              AutomationProperties.Name="应用并保存主题" Command="{Binding ApplyThemeCommand}" />
     </Grid>
+
     <Grid Grid.Row="2">
       <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="22" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
       <Border Style="{StaticResource Card}">
         <StackPanel>
-          <TextBlock Text="主题" Style="{StaticResource SectionTitle}" />
-          <TextBlock Text="当前阶段可实时切换浅色与深色；完整系统跟随、字号、圆角和密度将在主题基础阶段接入。" Style="{StaticResource SubtleText}" Margin="0,12,0,0" TextWrapping="Wrap" />
-          <Separator Margin="0,18" />
-          <TextBlock Text="更多参数" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
-          <ComboBox SelectedIndex="0" Margin="0,10,0,0" IsEnabled="False" ToolTip="完整主题参数尚未接入"><ComboBoxItem Content="舒适密度" /></ComboBox>
+          <TextBlock Text="主题与外观" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="修改先进入草稿；预览和取消都不会写入资源库或任务数据。" Style="{StaticResource SubtleText}" Margin="0,8,0,16" TextWrapping="Wrap" />
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="112" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="Auto" /><RowDefinition Height="12" />
+              <RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="Auto" /><RowDefinition Height="12" />
+              <RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="Auto" /><RowDefinition Height="12" />
+              <RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="主题名称" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+            <TextBox Grid.Column="1" Text="{Binding ThemeName, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="主题名称" />
+            <TextBlock Grid.Row="2" Text="基底模式" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+            <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding ThemeBaseOptions}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding DraftThemeBase, Mode=TwoWay}" AutomationProperties.Name="主题基底模式" />
+            <TextBlock Grid.Row="4" Text="强调色" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding AccentColor, UpdateSourceTrigger=PropertyChanged}" ToolTip="使用 #RRGGBB" AutomationProperties.Name="强调色" />
+            <TextBlock Grid.Row="6" Text="页面背景" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+            <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding SurfaceColor, UpdateSourceTrigger=PropertyChanged}" ToolTip="使用 #RRGGBB" AutomationProperties.Name="页面背景色" />
+            <TextBlock Grid.Row="8" Text="正文颜色" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+            <TextBox Grid.Row="8" Grid.Column="1" Text="{Binding TextColor, UpdateSourceTrigger=PropertyChanged}" ToolTip="使用 #RRGGBB；与背景对比度至少 4.5:1" AutomationProperties.Name="正文颜色" />
+            <TextBlock Grid.Row="10" Text="正文字号" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+            <ComboBox Grid.Row="10" Grid.Column="1" ItemsSource="{Binding FontSizeOptions}" SelectedItem="{Binding BodyFontSize, Mode=TwoWay}" AutomationProperties.Name="正文字号" />
+            <TextBlock Grid.Row="12" Text="圆角" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+            <ComboBox Grid.Row="12" Grid.Column="1" ItemsSource="{Binding CornerRadiusOptions}" SelectedItem="{Binding CornerRadius, Mode=TwoWay}" AutomationProperties.Name="圆角大小" />
+            <TextBlock Grid.Row="14" Text="显示密度" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" />
+            <StackPanel Grid.Row="14" Grid.Column="1" Orientation="Horizontal">
+              <ComboBox Width="150" ItemsSource="{Binding ThemeDensityOptions}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Density, Mode=TwoWay}" AutomationProperties.Name="显示密度" />
+              <CheckBox Content="启用界面动画" IsChecked="{Binding EnableAnimations, Mode=TwoWay}" Margin="18,0,0,0" VerticalAlignment="Center" AutomationProperties.Name="启用界面动画" />
+            </StackPanel>
+          </Grid>
+          <WrapPanel Margin="0,20,0,0">
+            <Button Content="预览" Style="{StaticResource SecondaryButton}" Command="{Binding PreviewThemeCommand}" Margin="0,0,10,10" />
+            <Button Content="取消修改" Style="{StaticResource SecondaryButton}" Command="{Binding CancelThemeCommand}" Margin="0,0,10,10" />
+            <Button Content="恢复默认" Style="{StaticResource SecondaryButton}" Command="{Binding ResetThemeCommand}" Margin="0,0,10,10" />
+            <Button Content="导入主题" Style="{StaticResource SecondaryButton}" Command="{Binding ImportThemeCommand}" Margin="0,0,10,10" />
+            <Button Content="导出主题" Style="{StaticResource SecondaryButton}" Command="{Binding ExportThemeCommand}" Margin="0,0,10,10" />
+            <Button Content="重新加载" Style="{StaticResource SecondaryButton}" Command="{Binding ReloadThemeCommand}" Margin="0,0,10,10" />
+          </WrapPanel>
         </StackPanel>
       </Border>
+
       <Border Grid.Column="2" Style="{StaticResource Card}">
         <StackPanel>
           <TextBlock Text="实时预览" Style="{StaticResource SectionTitle}" />
-          <Border Style="{StaticResource StatusBadge}" HorizontalAlignment="Left" Margin="0,15,0,10"><TextBlock Text="● 尚未检查环境" Foreground="{DynamicResource WarningBrush}" /></Border>
-          <TextBlock Text="切换主题只更新语义颜色资源，不重建页面 ViewModel，也不会生成任务或改变筛选状态。" Style="{StaticResource SubtleText}" TextWrapping="Wrap" />
+          <TextBlock Text="预览只更改当前窗口使用的语义资源。" Style="{StaticResource SubtleText}" Margin="0,8,0,18" TextWrapping="Wrap" />
+          <Border Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="{DynamicResource ControlCornerRadius}" Padding="16">
+            <StackPanel>
+              <TextBlock Text="资源库状态" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
+              <TextBlock Text="尚未检查环境" Foreground="{DynamicResource WarningBrush}" Margin="0,7,0,0" />
+              <TextBlock Text="真实状态会在完成只读检查后显示。" Style="{StaticResource SubtleText}" Margin="0,6,0,0" TextWrapping="Wrap" />
+              <Button Content="示例操作" Style="{StaticResource PrimaryButton}" IsEnabled="False" HorizontalAlignment="Left" Margin="0,16,0,0" />
+            </StackPanel>
+          </Border>
+          <Border Background="{DynamicResource WarningSoftBrush}" CornerRadius="{DynamicResource ControlCornerRadius}" Padding="12" Margin="0,16,0,0">
+            <TextBlock Text="{Binding ThemeNotice, Mode=OneWay}" Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap" />
+          </Border>
+          <TextBlock Text="保存位置" Style="{StaticResource SectionTitle}" Margin="0,22,0,0" />
+          <TextBlock Text="{Binding ThemeFileLocation, Mode=OneWay}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" TextWrapping="Wrap" />
         </StackPanel>
       </Border>
     </Grid>
+
+    <Border Grid.Row="4" Style="{StaticResource Card}">
+      <StackPanel>
+        <Grid>
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+          <StackPanel>
+            <TextBlock Text="资源库" Style="{StaticResource SectionTitle}" />
+            <TextBlock Text="{Binding ResourceLibraryLocation, Mode=OneWay}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" TextWrapping="Wrap" />
+            <TextBlock Text="资源包清单、任务和后续恢复记录会保存到你选择的资源库；选择本身不会扫描或写入 ComfyUI。" Style="{StaticResource SubtleText}" Margin="0,6,0,0" TextWrapping="Wrap" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" VerticalAlignment="Center">
+            <Button Content="选择资源库" Style="{StaticResource SecondaryButton}" Command="{Binding SelectResourceLibraryCommand}" AutomationProperties.Name="选择资源库" />
+            <Button Content="导出诊断摘要" Style="{StaticResource SecondaryButton}" Margin="0,10,0,0" Command="{Binding ExportDiagnosticsCommand}" AutomationProperties.Name="导出脱敏诊断摘要" />
+          </StackPanel>
+        </Grid>
+        <Separator Margin="0,20" />
+        <Grid>
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+          <StackPanel>
+            <TextBlock Text="关于 ComfyUI FlowPack" Style="{StaticResource SectionTitle}" />
+            <TextBlock Margin="0,8,0,0" Foreground="{DynamicResource TextBrush}">
+              <Run Text="作者：" /><Run Text="{Binding AuthorName, Mode=OneWay}" FontWeight="SemiBold" /><Run Text="   ·   版本：" /><Run Text="{Binding ApplicationVersion, Mode=OneWay}" />
+            </TextBlock>
+            <TextBlock Text="FlowPack 是面向 Windows x64 ComfyUI Desktop 的工作流资源管理与打包工具。" Style="{StaticResource SubtleText}" Margin="0,8,0,0" TextWrapping="Wrap" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+            <Button Content="打开 GitHub 仓库" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Command="{Binding OpenRepositoryCommand}" ToolTip="{Binding RepositoryUrl, Mode=OneWay}" AutomationProperties.Name="打开 LightyearXizIl 的 GitHub 仓库" />
+            <Button Content="复制仓库链接" Style="{StaticResource SecondaryButton}" Command="{Binding CopyRepositoryUrlCommand}" AutomationProperties.Name="复制 LightyearXizIl 的 GitHub 仓库链接" />
+          </StackPanel>
+        </Grid>
+      </StackPanel>
+    </Border>
   </Grid>
 </UserControl>

@@ -4,7 +4,7 @@
              AutomationProperties.AutomationId="Page.Packages">
   <Grid>
     <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" /><RowDefinition Height="22" /><RowDefinition Height="Auto" /><RowDefinition Height="18" /><RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" /><RowDefinition Height="22" /><RowDefinition Height="Auto" /><RowDefinition Height="12" /><RowDefinition Height="Auto" /><RowDefinition Height="18" /><RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
     <Grid>
       <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
@@ -12,13 +12,17 @@
         <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" />
         <TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
       </StackPanel>
-      <Button Grid.Column="1" Content="导入资源包" Style="{StaticResource PrimaryButton}" VerticalAlignment="Center" Command="{Binding ImportPackageCommand}" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+        <Button Content="导入资源包文件" Style="{StaticResource PrimaryButton}" Margin="0,0,10,0" Command="{Binding ImportPackageCommand}" />
+        <Button Content="导入已展开目录" Style="{StaticResource SecondaryButton}" Command="{Binding ImportPackageFolderCommand}" />
+      </StackPanel>
     </Grid>
     <StackPanel Grid.Row="2" Orientation="Horizontal">
       <Button Content="模型库" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Command="{Binding NavigateCommand}" CommandParameter="Models" />
       <Button Content="节点管理" Style="{StaticResource SecondaryButton}" Command="{Binding NavigateCommand}" CommandParameter="Nodes" />
     </StackPanel>
-    <Grid Grid.Row="4">
+    <TextBox Grid.Row="4" Text="{Binding PackageSearchText, UpdateSourceTrigger=PropertyChanged}" ToolTip="按名称、版本或状态搜索资源包" AutomationProperties.Name="搜索资源包" />
+    <Grid Grid.Row="6">
       <Border>
         <Border.Style>
           <Style TargetType="Border" BasedOn="{StaticResource EmptyStateCard}">
@@ -27,11 +31,14 @@
         </Border.Style>
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
           <TextBlock Text="还没有资源包" Style="{StaticResource SectionTitle}" HorizontalAlignment="Center" />
-          <TextBlock Text="导入真实 .cpack.json 清单后，它会出现在当前会话中。" Style="{StaticResource SubtleText}" Margin="0,7,0,18" />
-          <Button Content="导入资源包" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Center" Command="{Binding ImportPackageCommand}" />
+          <TextBlock Text="导入已校验的清单、.cpack 或已展开目录后，它会保存到当前资源库。" Style="{StaticResource SubtleText}" Margin="0,7,0,18" />
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+            <Button Content="导入文件" Style="{StaticResource PrimaryButton}" Margin="0,0,10,0" Command="{Binding ImportPackageCommand}" />
+            <Button Content="导入目录" Style="{StaticResource SecondaryButton}" Command="{Binding ImportPackageFolderCommand}" />
+          </StackPanel>
         </StackPanel>
       </Border>
-      <ItemsControl ItemsSource="{Binding Packages}">
+      <ItemsControl ItemsSource="{Binding PackageView}">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
             <Border Style="{StaticResource Card}" Margin="0,0,0,12">
