@@ -58,6 +58,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged
     private readonly IInstanceInspector _instanceInspector;
     private ResourceLibraryDatabase? _libraryDatabase;
     private InstanceFingerprint? _candidateInstance;
+    private readonly IComfyDesktopDetector? _desktopDetector;
+    private ComfyDesktopLocation? _detectedDesktop;
     private InstallPlan? _installPlan;
     private ThemeDefinition _appliedTheme;
     private ThemeDefinition _draftTheme;
@@ -73,18 +75,20 @@ public sealed class ShellViewModel : INotifyPropertyChanged
     private PackageDraft _packageDraft = CreateEmptyDraft();
     private string _wizardStatus = "请选择工作流开始创建草稿。";
 
-    public ShellViewModel() : this(null, null, null)
+    public ShellViewModel() : this(null, null, null, null)
     {
     }
 
     public ShellViewModel(
         ThemePreferenceStore? themeStore,
         LibraryBindingStore? libraryBindingStore = null,
-        IInstanceInspector? instanceInspector = null)
+        IInstanceInspector? instanceInspector = null,
+        IComfyDesktopDetector? desktopDetector = null)
     {
         _themeStore = themeStore ?? new ThemePreferenceStore();
         _libraryBindingStore = libraryBindingStore ?? new LibraryBindingStore();
         _instanceInspector = instanceInspector ?? new ComfyUiInspector();
+        _desktopDetector = desktopDetector;
         _appliedTheme = LoadInitialTheme();
         _draftTheme = _appliedTheme;
         NavigateCommand = new RelayCommand(parameter =>
@@ -97,6 +101,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged
         OpenPackageCommand = new RelayCommand(OpenPackage, parameter => parameter is PackageRow);
         ToggleThemeCommand = new RelayCommand(_ => ToggleQuickTheme());
         StartInstallCommand = new RelayCommand(_ => { }, _ => false);
+        DetectDesktopCommand = new RelayCommand(_ => _ = DetectDesktopAsync());
         ImportPackageCommand = new RelayCommand(_ => _ = ImportPackageAsync());
         ImportPackageFolderCommand = new RelayCommand(_ => _ = ImportPackageFolderAsync());
         ImportWorkflowCommand = new RelayCommand(_ => _ = ImportWorkflowAsync());
@@ -252,6 +257,25 @@ public sealed class ShellViewModel : INotifyPropertyChanged
             OnPropertyChanged();
         }
     }
+
+    private async Task DetectDesktopAsync()
+    {
+        if (_desktopDetector is null) return;
+        try
+        {
+            var location = await _desktopDetector.DetectAsync();
+            _detectedDesktop = location;
+            OnPropertyChanged(nameof(DetectedDesktop));
+            OnPropertyChanged(nameof(DesktopSummary));
+            StatusNotice = location is null
+                ? "●  未检测到 ComfyUI Desktop"
+                : $"●  已检测 ComfyUI Desktop（{location.DetectedVia}）：{location.BasePath}";
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            ThemeNotice = $"检测 ComfyUI Desktop 失败：{exception.Message}";
+        }
+    }
     public bool HasPackages => Packages.Count > 0;
     public bool HasTasks => Tasks.Count > 0;
     public bool HasWorkflows => Workflows.Count > 0;
@@ -274,6 +298,12 @@ public sealed class ShellViewModel : INotifyPropertyChanged
         }
     }
     public string DownloadPackageButtonText => IsDownloadingPackage ? "下载中…" : "下载到 staging";
+
+    public ICommand DetectDesktopCommand { get; }
+    public ComfyDesktopLocation? DetectedDesktop => _detectedDesktop;
+    public string DesktopSummary => _detectedDesktop is null
+        ? "未检测到 ComfyUI Desktop；可在设置中选择安装目录。"
+        : $"已检测 ComfyUI Desktop（来自 {_detectedDesktop.DetectedVia}）";
     public string InstallPreviewEnvironment => _candidateInstance is null
         ? "●  尚未检查"
         : "●  候选布局已检查，待 Desktop 适配验证";

@@ -48,13 +48,20 @@
           "SQLitePCLRaw.core": "2.1.12"
         }
       },
+      "flowpack.comfyui": {
+        "type": "Project",
+        "dependencies": {
+          "FlowPack.Core": "[0.0.2, )"
+        }
+      },
       "flowpack.core": {
         "type": "Project"
       },
       "flowpack.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "FlowPack.Core": "[0.0.1, )",
+          "FlowPack.ComfyUI": "[0.0.2, )",
+          "FlowPack.Core": "[0.0.2, )",
           "Microsoft.Data.Sqlite": "[10.0.12, )"
         }
       }

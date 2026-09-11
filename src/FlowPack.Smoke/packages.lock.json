@@ -40,15 +40,15 @@
       "ComfyUI.FlowPack": {
         "type": "Project",
         "dependencies": {
-          "FlowPack.ComfyUI": "[0.0.1, )",
-          "FlowPack.Core": "[0.0.1, )",
-          "FlowPack.Infrastructure": "[0.0.1, )"
+          "FlowPack.ComfyUI": "[0.0.2, )",
+          "FlowPack.Core": "[0.0.2, )",
+          "FlowPack.Infrastructure": "[0.0.2, )"
         }
       },
       "flowpack.comfyui": {
         "type": "Project",
         "dependencies": {
-          "FlowPack.Core": "[0.0.1, )"
+          "FlowPack.Core": "[0.0.2, )"
         }
       },
       "flowpack.core": {
@@ -57,7 +57,8 @@
       "flowpack.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "FlowPack.Core": "[0.0.1, )",
+          "FlowPack.ComfyUI": "[0.0.2, )",
+          "FlowPack.Core": "[0.0.2, )",
           "Microsoft.Data.Sqlite": "[10.0.12, )"
         }
       },

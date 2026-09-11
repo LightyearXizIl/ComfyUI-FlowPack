@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\FlowPack.Core\FlowPack.Core.csproj" />
+    <ProjectReference Include="..\FlowPack.ComfyUI\FlowPack.ComfyUI.csproj" />
     <PackageReference Include="Microsoft.Data.Sqlite" />
   </ItemGroup>
 </Project>

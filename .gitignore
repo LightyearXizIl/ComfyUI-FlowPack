@@ -29,3 +29,4 @@ TestResults/
 *.log
 Thumbs.db
 .DS_Store
+.workbuddy/
