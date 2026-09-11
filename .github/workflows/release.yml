@@ -1,0 +1,55 @@
+name: Build and release Windows installer
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  windows-release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build, test, and package
+        shell: powershell
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          .\build\Build-Release.ps1 -Version $version
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ComfyUI-FlowPack-${{ github.ref_name }}-Windows
+          path: |
+            artifacts/installer/*.exe
+            artifacts/installer/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $notes = "release-notes\$tag.md"
+          $assets = @((Get-ChildItem artifacts\installer\*.exe).FullName)
+          $assets += (Resolve-Path artifacts\installer\SHA256SUMS.txt).Path
+          if (Test-Path $notes) {
+            gh release create $tag --repo $env:GITHUB_REPOSITORY --verify-tag --title "ComfyUI FlowPack $($tag.TrimStart('v'))" --notes-file $notes @assets
+          } else {
+            gh release create $tag --repo $env:GITHUB_REPOSITORY --verify-tag --title "ComfyUI FlowPack $($tag.TrimStart('v'))" --generate-notes @assets
+          }

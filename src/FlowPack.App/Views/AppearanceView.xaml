@@ -1,0 +1,32 @@
+<UserControl x:Class="FlowPack.App.Views.AppearanceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.AutomationId="Page.Appearance">
+  <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="28" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+      <StackPanel><TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" /><TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" /></StackPanel>
+      <Button Grid.Column="1" Content="切换明暗主题" Style="{StaticResource PrimaryButton}" VerticalAlignment="Center" Command="{Binding ToggleThemeCommand}" />
+    </Grid>
+    <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="22" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="主题" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="当前阶段可实时切换浅色与深色；完整系统跟随、字号、圆角和密度将在主题基础阶段接入。" Style="{StaticResource SubtleText}" Margin="0,12,0,0" TextWrapping="Wrap" />
+          <Separator Margin="0,18" />
+          <TextBlock Text="更多参数" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
+          <ComboBox SelectedIndex="0" Margin="0,10,0,0" IsEnabled="False" ToolTip="完整主题参数尚未接入"><ComboBoxItem Content="舒适密度" /></ComboBox>
+        </StackPanel>
+      </Border>
+      <Border Grid.Column="2" Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="实时预览" Style="{StaticResource SectionTitle}" />
+          <Border Style="{StaticResource StatusBadge}" HorizontalAlignment="Left" Margin="0,15,0,10"><TextBlock Text="● 尚未检查环境" Foreground="{DynamicResource WarningBrush}" /></Border>
+          <TextBlock Text="切换主题只更新语义颜色资源，不重建页面 ViewModel，也不会生成任务或改变筛选状态。" Style="{StaticResource SubtleText}" TextWrapping="Wrap" />
+        </StackPanel>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

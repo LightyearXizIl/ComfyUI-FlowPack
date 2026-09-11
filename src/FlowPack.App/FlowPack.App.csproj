@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>ComfyUI.FlowPack</AssemblyName>
+    <ApplicationIcon>Assets\FlowPack.ico</ApplicationIcon>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\FlowPack.Core\FlowPack.Core.csproj" />
+    <ProjectReference Include="..\FlowPack.Infrastructure\FlowPack.Infrastructure.csproj" />
+    <ProjectReference Include="..\FlowPack.ComfyUI\FlowPack.ComfyUI.csproj" />
+    <Resource Include="..\..\LOGO 图标.png" Link="Assets\Logo.png" />
+    <Resource Include="Assets\FlowPack.ico" />
+  </ItemGroup>
+</Project>

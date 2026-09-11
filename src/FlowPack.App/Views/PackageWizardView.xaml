@@ -1,0 +1,24 @@
+<UserControl x:Class="FlowPack.App.Views.PackageWizardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.AutomationId="Page.PackageWizard">
+  <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="28" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+      <StackPanel>
+        <Button Content="← 返回工作流" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AccentBrush}" Padding="0" HorizontalAlignment="Left" Cursor="Hand" Command="{Binding NavigateCommand}" CommandParameter="Workflows" />
+        <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" Margin="0,10,0,0" />
+        <TextBlock Text="第 1 步，共 4 步：选择工作流。" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
+      </StackPanel>
+      <Button Grid.Column="1" Content="下一步" Style="{StaticResource PrimaryButton}" VerticalAlignment="Bottom" IsEnabled="False" ToolTip="先选择有效工作流" />
+    </Grid>
+    <Border Grid.Row="2" Style="{StaticResource Card}">
+      <StackPanel>
+        <TextBlock Text="选择一个工作流" Style="{StaticResource SectionTitle}" />
+        <TextBlock Text="FlowPack 会保留未知字段；在解析与草稿持久化功能接入前，不会伪造依赖结果。" Style="{StaticResource SubtleText}" Margin="0,7,0,18" TextWrapping="Wrap" />
+        <Button Content="选择工作流文件" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" IsEnabled="False" ToolTip="工作流解析功能接入后开放" />
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

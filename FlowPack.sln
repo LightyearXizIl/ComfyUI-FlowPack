@@ -1,0 +1,54 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowPack.Core", "src\FlowPack.Core\FlowPack.Core.csproj", "{879B076C-402B-4C90-9A39-E7E4A91E5DF5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowPack.Infrastructure", "src\FlowPack.Infrastructure\FlowPack.Infrastructure.csproj", "{B7EA8839-062A-4194-AFAD-0B2AE33AF4C8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowPack.ComfyUI", "src\FlowPack.ComfyUI\FlowPack.ComfyUI.csproj", "{D2E132A6-2E31-472A-8197-DAB728A61F9A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowPack.Worker", "src\FlowPack.Worker\FlowPack.Worker.csproj", "{FD94C350-53C7-44B5-9BEB-91714E97FC05}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowPack.App", "src\FlowPack.App\FlowPack.App.csproj", "{50BAFFDA-7011-4922-A293-1A9B54BF7D75}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowPack.Tests", "src\FlowPack.Tests\FlowPack.Tests.csproj", "{B119B73D-9768-4D20-AD80-F5D8AF23E9F1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowPack.Smoke", "src\FlowPack.Smoke\FlowPack.Smoke.csproj", "{65D2BC4E-39DF-46CB-952E-2E90B79DA179}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{879B076C-402B-4C90-9A39-E7E4A91E5DF5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{879B076C-402B-4C90-9A39-E7E4A91E5DF5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{879B076C-402B-4C90-9A39-E7E4A91E5DF5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{879B076C-402B-4C90-9A39-E7E4A91E5DF5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7EA8839-062A-4194-AFAD-0B2AE33AF4C8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7EA8839-062A-4194-AFAD-0B2AE33AF4C8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7EA8839-062A-4194-AFAD-0B2AE33AF4C8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7EA8839-062A-4194-AFAD-0B2AE33AF4C8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D2E132A6-2E31-472A-8197-DAB728A61F9A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D2E132A6-2E31-472A-8197-DAB728A61F9A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D2E132A6-2E31-472A-8197-DAB728A61F9A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D2E132A6-2E31-472A-8197-DAB728A61F9A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FD94C350-53C7-44B5-9BEB-91714E97FC05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FD94C350-53C7-44B5-9BEB-91714E97FC05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FD94C350-53C7-44B5-9BEB-91714E97FC05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FD94C350-53C7-44B5-9BEB-91714E97FC05}.Release|Any CPU.Build.0 = Release|Any CPU
+		{50BAFFDA-7011-4922-A293-1A9B54BF7D75}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{50BAFFDA-7011-4922-A293-1A9B54BF7D75}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{50BAFFDA-7011-4922-A293-1A9B54BF7D75}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{50BAFFDA-7011-4922-A293-1A9B54BF7D75}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B119B73D-9768-4D20-AD80-F5D8AF23E9F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B119B73D-9768-4D20-AD80-F5D8AF23E9F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B119B73D-9768-4D20-AD80-F5D8AF23E9F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B119B73D-9768-4D20-AD80-F5D8AF23E9F1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{65D2BC4E-39DF-46CB-952E-2E90B79DA179}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{65D2BC4E-39DF-46CB-952E-2E90B79DA179}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{65D2BC4E-39DF-46CB-952E-2E90B79DA179}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{65D2BC4E-39DF-46CB-952E-2E90B79DA179}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

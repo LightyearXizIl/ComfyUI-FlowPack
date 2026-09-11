@@ -1,0 +1,69 @@
+<UserControl x:Class="FlowPack.App.Views.HomeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.AutomationId="Page.Home">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="28" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="24" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+      <StackPanel>
+        <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" />
+        <TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+        <Button Content="导入资源包" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Command="{Binding ImportPackageCommand}" />
+        <Button Content="创建资源包" Style="{StaticResource PrimaryButton}" Command="{Binding NavigateCommand}" CommandParameter="PackageWizard" />
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Row="2">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="1.1*" /><ColumnDefinition Width="22" /><ColumnDefinition Width="0.9*" /></Grid.ColumnDefinitions>
+      <Border Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="当前 ComfyUI 环境" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="尚未选择或检查 ComfyUI Desktop 实例" Style="{StaticResource SubtleText}" Margin="0,8,0,18" />
+          <Border Background="{DynamicResource WarningSoftBrush}" CornerRadius="7" Padding="12">
+            <StackPanel>
+              <TextBlock Text="●  尚未检查" Foreground="{DynamicResource WarningBrush}" FontWeight="SemiBold" />
+              <TextBlock Text="FlowPack 尚未读取本机环境，因此不会显示已连接或已就绪。" Style="{StaticResource SubtleText}" Margin="0,4,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+          <Button Content="选择 ComfyUI 环境"
+                  Style="{StaticResource SecondaryButton}"
+                  HorizontalAlignment="Left"
+                  Margin="0,18,0,0"
+                  IsEnabled="False"
+                  ToolTip="环境发现与绑定将在实例适配功能接入后开放" />
+        </StackPanel>
+      </Border>
+
+      <Border Grid.Column="2" Style="{StaticResource Card}">
+        <StackPanel>
+          <TextBlock Text="当前任务" Style="{StaticResource SectionTitle}" />
+          <TextBlock Text="暂无进行中的任务" Margin="0,16,0,5" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
+          <TextBlock Text="真实下载或安装开始后，阶段与进度会显示在这里。" Style="{StaticResource SubtleText}" TextWrapping="Wrap" />
+          <Button Content="前往任务中心" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Left" Margin="0,18,0,0" Command="{Binding NavigateCommand}" CommandParameter="Tasks" />
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <Border Grid.Row="4" Style="{StaticResource Card}">
+      <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="44" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+        <TextBlock Text="＋" FontSize="25" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1">
+          <TextBlock Text="从工作流开始" FontWeight="SemiBold" FontSize="16" Foreground="{DynamicResource TextBrush}" />
+          <TextBlock Text="进入工作流页面，导入文件后再分析真实节点、模型和素材依赖。" Style="{StaticResource SubtleText}" Margin="0,5,0,0" />
+        </StackPanel>
+        <Button Grid.Column="2" Content="查看工作流" Style="{StaticResource PrimaryButton}" VerticalAlignment="Center" Command="{Binding NavigateCommand}" CommandParameter="Workflows" />
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

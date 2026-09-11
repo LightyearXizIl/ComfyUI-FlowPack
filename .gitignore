@@ -1,0 +1,31 @@
+# Build outputs
+**/bin/
+**/obj/
+artifacts/publish/
+artifacts/installer/
+artifacts/install-test/
+artifacts/acceptance/
+TestResults/
+
+# IDE and user state
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pfx
+*.snk
+*.key
+*.pem
+
+# Temporary files
+*.tmp
+*.log
+Thumbs.db
+.DS_Store

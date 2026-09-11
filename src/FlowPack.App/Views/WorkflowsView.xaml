@@ -1,0 +1,20 @@
+<UserControl x:Class="FlowPack.App.Views.WorkflowsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.AutomationId="Page.Workflows">
+  <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="28" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+      <StackPanel><TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" /><TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" /></StackPanel>
+      <Button Grid.Column="1" Content="导入工作流" Style="{StaticResource PrimaryButton}" VerticalAlignment="Center" IsEnabled="False" ToolTip="工作流解析与持久化接入后开放" />
+    </Grid>
+    <Border Grid.Row="2" Style="{StaticResource EmptyStateCard}">
+      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+        <TextBlock Text="还没有工作流" Style="{StaticResource SectionTitle}" HorizontalAlignment="Center" />
+        <TextBlock Text="当前没有导入记录，也不会显示预置示例。" Style="{StaticResource SubtleText}" Margin="0,7,0,18" />
+        <Button Content="创建资源包" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Center" Command="{Binding NavigateCommand}" CommandParameter="PackageWizard" />
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

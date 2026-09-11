@@ -1,0 +1,16 @@
+<UserControl x:Class="FlowPack.App.Views.ModelsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.AutomationId="Page.Models">
+  <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="28" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <StackPanel>
+      <Button Content="← 返回资源包" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AccentBrush}" Padding="0" HorizontalAlignment="Left" Cursor="Hand" Command="{Binding NavigateCommand}" CommandParameter="Packages" />
+      <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" Margin="0,10,0,0" />
+      <TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
+    </StackPanel>
+    <Border Grid.Row="2" Style="{StaticResource EmptyStateCard}">
+      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"><TextBlock Text="尚未建立模型索引" Style="{StaticResource SectionTitle}" /><TextBlock Text="绑定环境和资源库后，这里才会显示实际模型。" Style="{StaticResource SubtleText}" Margin="0,7,0,0" /></StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

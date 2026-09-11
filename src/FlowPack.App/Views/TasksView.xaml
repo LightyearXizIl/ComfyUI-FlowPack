@@ -1,0 +1,44 @@
+<UserControl x:Class="FlowPack.App.Views.TasksView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             AutomationProperties.AutomationId="Page.Tasks">
+  <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="28" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+    <StackPanel>
+      <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" />
+      <TextBlock Text="{Binding PageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
+    </StackPanel>
+    <Grid Grid.Row="2">
+      <Border>
+        <Border.Style>
+          <Style TargetType="Border" BasedOn="{StaticResource EmptyStateCard}">
+            <Style.Triggers><DataTrigger Binding="{Binding HasTasks}" Value="True"><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
+          </Style>
+        </Border.Style>
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+          <TextBlock Text="暂无任务" Style="{StaticResource SectionTitle}" HorizontalAlignment="Center" />
+          <TextBlock Text="只有 Worker 返回的真实下载、校验或安装任务才会显示在这里。" Style="{StaticResource SubtleText}" Margin="0,7,0,18" />
+          <Button Content="查看资源包" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Center" Command="{Binding NavigateCommand}" CommandParameter="Packages" />
+        </StackPanel>
+      </Border>
+      <ItemsControl ItemsSource="{Binding Tasks}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+              <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="80" /></Grid.ColumnDefinitions>
+                <StackPanel>
+                  <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextBrush}" />
+                  <TextBlock Text="{Binding Stage}" Style="{StaticResource SubtleText}" Margin="0,5,0,10" />
+                  <ProgressBar Value="{Binding Progress}" Maximum="100" Height="6" Foreground="{DynamicResource AccentBrush}" Background="{DynamicResource AccentSoftBrush}" BorderThickness="0" />
+                  <TextBlock Text="{Binding Detail}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="{Binding Progress, StringFormat={}{0}%}" Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" HorizontalAlignment="Right" />
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Grid>
+  </Grid>
+</UserControl>

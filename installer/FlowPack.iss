@@ -1,0 +1,51 @@
+#ifndef MyAppVersion
+  #define MyAppVersion "0.0.1"
+#endif
+
+#define MyAppName "ComfyUI FlowPack"
+#define MyAppPublisher "FlowPack"
+#define MyAppExeName "ComfyUI.FlowPack.exe"
+
+[Setup]
+AppId={{B203065A-7E82-4F0A-B3B3-43CC5E1C5BC6}
+AppName={#MyAppName}
+AppVersion={#MyAppVersion}
+AppVerName={#MyAppName} {#MyAppVersion}
+AppPublisher={#MyAppPublisher}
+DefaultDirName={localappdata}\Programs\ComfyUI FlowPack
+DefaultGroupName=ComfyUI FlowPack
+DisableProgramGroupPage=yes
+PrivilegesRequired=lowest
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
+OutputDir=..\artifacts\installer
+OutputBaseFilename=ComfyUI-FlowPack-{#MyAppVersion}-Setup
+SetupIconFile=..\src\FlowPack.App\Assets\FlowPack.ico
+UninstallDisplayIcon={app}\{#MyAppExeName}
+Compression=lzma2/max
+SolidCompression=yes
+WizardStyle=modern
+CloseApplications=yes
+RestartApplications=no
+VersionInfoVersion={#MyAppVersion}.0
+VersionInfoProductName={#MyAppName}
+VersionInfoProductVersion={#MyAppVersion}
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription={#MyAppName} Windows installer
+
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+
+[Tasks]
+Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "其他任务："; Flags: unchecked
+
+[Files]
+Source: "..\artifacts\publish\app\*"; DestDir: "{app}"; Excludes: "*.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\artifacts\publish\worker\*"; DestDir: "{app}\worker"; Excludes: "*.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs
+
+[Icons]
+Name: "{group}\ComfyUI FlowPack"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"
+Name: "{autodesktop}\ComfyUI FlowPack"; Filename: "{app}\{#MyAppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
+
+[Run]
+Filename: "{app}\{#MyAppExeName}"; Description: "启动 ComfyUI FlowPack"; Flags: nowait postinstall skipifsilent
