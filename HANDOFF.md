@@ -20,19 +20,18 @@
 
 | 项目 | 当前事实 |
 | --- | --- |
-| `main` 当前提交 | `9825242daf8cbddbdce64d035d41806f60a1675d`（发布验证文档） |
-| `v0.0.1` 源码提交 | `af5893aa247f8db98fbb21c607df5865cf01c390` |
-| GitHub Actions | [运行 34565404527](https://github.com/LightyearXizIl/ComfyUI-FlowPack/actions/runs/34565404527)，结论为 `success` |
-| GitHub Release | [`v0.0.1`](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.1)，非草稿、非预发布 |
-| 远程安装包 | [ComfyUI-FlowPack-0.0.1-Setup.exe](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/download/v0.0.1/ComfyUI-FlowPack-0.0.1-Setup.exe) |
-| 远程大小与 SHA-256 | 72,472,025 字节；`0678AA24C73C8E0CC49E43DF2CA2317AE105114395D8C0D6120ACF27171BA895` |
-| 本地安装包 | `artifacts/installer/ComfyUI-FlowPack-0.0.1-Setup.exe` |
-| 本地大小与 SHA-256 | 72,460,637 字节；`9B3935FCF0ED5B8FDE85B9E4D86733AF285890A89C4075B55241D6140907CC7B` |
+| `v0.0.2` 源码提交 | `4e3a95cd5ebea5b5edff8b4806dbffa435369264` |
+| GitHub Actions | [运行 34579299090](https://github.com/LightyearXizIl/ComfyUI-FlowPack/actions/runs/34579299090)，结论为 `success` |
+| GitHub Release | [`v0.0.2`](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.2)，非草稿、非预发布 |
+| 远程安装包 | [ComfyUI-FlowPack-0.0.2-Setup.exe](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/download/v0.0.2/ComfyUI-FlowPack-0.0.2-Setup.exe) |
+| 远程大小与 SHA-256 | 74,284,159 字节；`DD4498F0938290AC4F9E5DD41DED367D12E51FC39B0712F73372F521ED2A75A3` |
+| 本地安装包 | `artifacts/installer/ComfyUI-FlowPack-0.0.2-Setup.exe` |
+| 本地大小与 SHA-256 | 74,275,707 字节；`E34524FBD4CDE48C64AE82A754408566FA20717A5BB10FDB9CFF901FE8197317` |
 | 代码签名 | `NotSigned`，不能声称已签名 |
 
-本地构建的安装包已通过隔离目录静默安装、实际启动、版本检查、Worker 退出码检查和静默卸载。远程资产已核对 GitHub 服务器摘要与 `SHA256SUMS.txt` 一致，但本机完整下载远程安装包未成功，因此不能登记“远程下载后本机安装”通过。两份安装包来自不同构建，大小和哈希不同是已记录事实，不能把本地哈希用于验证远程文件。
+本地构建已通过锁定还原、Debug/Release 各 53 项测试、自包含发布和安装器编译。远程资产已核对 GitHub 服务器摘要与 `SHA256SUMS.txt` 一致，但本机没有重新执行安装、启动、卸载或完整下载远程安装包，因此不能登记“安装生命周期”或“远程下载后本机安装”通过。两份安装包来自不同构建，大小和哈希不同是已记录事实，不能把本地哈希用于验证远程文件。
 
-详细证据见 [`docs/RELEASE_0.0.1.md`](docs/RELEASE_0.0.1.md)。`v0.0.1` 已正式发布，不要移动或重写该标签；后续文档和代码应通过新提交推进。
+详细证据见 [`docs/RELEASE_0.0.2.md`](docs/RELEASE_0.0.2.md)。`v0.0.2` 已正式发布，不要移动或重写该标签；后续文档和代码应通过新提交推进。
 
 ## 3. 当前工程结构
 
