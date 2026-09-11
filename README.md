@@ -2,9 +2,9 @@
 
 ComfyUI FlowPack 是面向 Windows x64 与官方 ComfyUI Desktop 的工作流资源安装和打包工具。
 
-## 0.1.0 本地候选状态
+## 0.0.3 本地候选状态
 
-`0.1.0` 是未发布的本地候选，不是已验收的正式安装版。目前完成了：
+`0.0.3` 是未发布的本地候选，不是已验收的正式安装版。目前完成了：
 
 - WPF 桌面壳层及首页、资源库、打包、安装、任务、设置六个区域；
 - 简体中文/英文运行时切换与语言偏好保存；
@@ -29,7 +29,7 @@ ComfyUI FlowPack 是面向 Windows x64 与官方 ComfyUI Desktop 的工作流资
 ```powershell
 dotnet restore .\FlowPack.sln --locked-mode
 dotnet test .\FlowPack.sln -c Release --no-restore
-.\build\Build-Release.ps1 -Version 0.1.0
+.\build\Build-Release.ps1 -Version 0.0.3
 ```
 
 安装器输出到 `artifacts/installer/`。
@@ -43,4 +43,4 @@ dotnet test .\FlowPack.sln -c Release --no-restore
 
 ## 已知限制
 
-0.1.0 候选已在本机构建安装器并通过其 Release 测试步骤；未进行干净机安装/卸载验收、未打标签、未推送、未创建 GitHub Release，且没有代码签名。Windows 可能显示未知发布者提示。
+0.0.3 候选已在本机构建安装器并通过其 Release 测试步骤；未进行干净机安装/卸载验收、未打标签、未推送、未创建 GitHub Release，且没有代码签名。Windows 可能显示未知发布者提示。

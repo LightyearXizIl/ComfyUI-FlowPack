@@ -1,6 +1,6 @@
 # ComfyUI FlowPack 前端视觉参考
 
-本文件和 `frontend-references/` 中的 9 张 PNG 是 ComfyUI FlowPack 的视觉基准。`v0.1.0` 将旧视图收敛到六个顶层区域；参考图继续用于其中嵌入视图的层级、间距、色彩和交互状态。
+本文件和 `frontend-references/` 中的 9 张 PNG 是 ComfyUI FlowPack 的视觉基准。`v0.0.3` 将旧视图收敛到六个顶层区域；参考图继续用于其中嵌入视图的层级、间距、色彩和交互状态。
 
 ## 全局框架
 

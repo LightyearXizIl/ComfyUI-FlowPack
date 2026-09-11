@@ -70,7 +70,7 @@ public sealed class ShellViewModelTests
 
         Assert.Equal("LightyearXizIl", viewModel.AuthorName);
         Assert.Equal("https://github.com/LightyearXizIl/ComfyUI-FlowPack", viewModel.RepositoryUrl);
-        Assert.Equal("0.1.0", viewModel.ApplicationVersion);
+        Assert.Equal("0.0.3", viewModel.ApplicationVersion);
         Assert.True(viewModel.OpenRepositoryCommand.CanExecute(null));
         Assert.True(viewModel.CopyRepositoryUrlCommand.CanExecute(null));
         Assert.True(viewModel.ExportDiagnosticsCommand.CanExecute(null));
