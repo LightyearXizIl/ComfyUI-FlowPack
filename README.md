@@ -43,4 +43,4 @@ dotnet test .\FlowPack.sln -c Release --no-restore
 
 ## 已知限制
 
-0.0.3 候选已在本机构建安装器并通过其 Release 测试步骤；未进行干净机安装/卸载验收、未打标签、未推送、未创建 GitHub Release，且没有代码签名。Windows 可能显示未知发布者提示。
+0.0.3 已推送、打标签并创建 GitHub Release；安装器未进行干净机安装/卸载验收，且没有代码签名。Windows 可能显示未知发布者提示。

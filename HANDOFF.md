@@ -1,10 +1,10 @@
 # ComfyUI FlowPack 开发交接
 
-最后更新：2026-09-11｜工作分支：`main`｜当前源码版本：`0.0.3`（本地候选，未发布）
+最后更新：2026-09-12｜工作分支：`main`｜当前源码版本：`0.0.3`（已发布，未签名）
 
 ## 结论
 
-`v0.0.3` 已完成 A–F 基线封存、六区壳层、运行时中英双语、受限 ZIP staging、schema v6 迁移备份、只读 Desktop 适配器和更新元数据校验。它**不是**已完成实机验收的正式版：真实 Desktop 写入入口仍禁用，L1–L4、journal 恢复、安装/升级/卸载、下载续传和干净机安装器验收均未完成。
+`v0.0.3` 已完成 A–F 基线封存、六区壳层、运行时中英双语、受限 ZIP staging、schema v6 迁移备份、只读 Desktop 适配器和更新元数据校验，并已发布。它**不是**已完成实机验收的正式版：真实 Desktop 写入入口仍禁用，L1–L4、journal 恢复、安装/升级/卸载、下载续传和干净机安装器验收均未完成。
 
 不要把本地候选构建、自动化单测或页面文案当成正式发布/实机验证证据。
 
@@ -13,7 +13,7 @@
 - A–F 后端基础已独立提交：`7c539f4 feat: add ComfyUI resource foundations`。
 - v0.0.3 源码与交接基线分别在 `ac82558`、`1d7192e`；版本号修正将以独立提交保留。
 - `.workbuddy/` 已在 `.gitignore`，不得提交。
-- 已生成本地安装器，未执行推送、标签、GitHub Release 或远程发布；该安装器为 `NotSigned`，不能声称已签名。
+- 已推送 `main`，发布标签 `v0.0.3` 与 [GitHub Release](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.3)；安装器为 `NotSigned`，不能声称已签名。
 
 ## 当前实现
 
@@ -39,16 +39,17 @@
 
 - 锁定还原、Debug 与 Release 均为 **101/101**，`git diff --check` 通过。
 - 本地安装器：`artifacts/installer/ComfyUI-FlowPack-0.0.3-Setup.exe`，74,387,576 字节，SHA-256 `175DFC33E1DC6B9FDF63F6013EDC4762F1018E25D607BCBC5E29249974FEEB62`，Authenticode `NotSigned`。仅验证生成，未做干净机安装/卸载。
+- 远程资产：[ComfyUI-FlowPack-0.0.3-Setup.exe](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/download/v0.0.3/ComfyUI-FlowPack-0.0.3-Setup.exe)（74,387,576 字节）与 [SHA256SUMS.txt](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/download/v0.0.3/SHA256SUMS.txt)（99 字节）；Release 非草稿、非预发布。
 - 本机只读确认过 Desktop 配置和实例路径；未进行写入、停机、配置修改或真实生成。
 
 ## 下一步（按安全依赖顺序）
 
-1. 提交本轮 v0.0.3 版本号修正，先跑锁定还原、Debug/Release、diff 检查与本地候选构建。
+1. 为 v0.0.3 之后的下一轮开发建立新版本计划；已发布标签不得移动。
 2. 将库写操作收口到 Worker：实现 requestId 幂等、库锁、任务尝试、暂停/继续/取消/重试及 journal 恢复报告。
 3. 以两个隔离官方 Desktop 实例实测适配器、配置备份受管段、实例锁、源/目标哈希与 Python wheel 冲突策略；不要用当前真实配置目录写测。
 4. 实现 L1–L3；L4 只跟踪 FlowPack 发出的 `prompt_id`，禁止清全局队列或中断他人任务。
 5. 补齐 `.cpack` 三格式往返、ZIP64/恶意归档、HTTP 恢复、DPI/高对比/键盘和安装器生命周期测试。
-6. 取得明确授权后才签名（如有证书）、打标签、推送和发布远程 `v0.0.3`。
+6. 后续版本取得明确授权后才签名（如有证书）、打标签、推送和发布。
 
 ## 关键文件
 
