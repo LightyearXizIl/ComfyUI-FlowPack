@@ -38,7 +38,7 @@
 ## 已验证的本机证据
 
 - 锁定还原、Debug 与 Release 均为 **101/101**，`git diff --check` 通过。
-- 本地安装器：`artifacts/installer/ComfyUI-FlowPack-0.0.3-Setup.exe`，71,453,188 字节，SHA-256 `175DFC33E1DC6B9FDF63F6013EDC4762F1018E25D607BCBC5E29249974FEEB62`，Authenticode `NotSigned`。仅验证生成，未做干净机安装/卸载。
+- 本地安装器：`artifacts/installer/ComfyUI-FlowPack-0.0.3-Setup.exe`，74,387,576 字节，SHA-256 `175DFC33E1DC6B9FDF63F6013EDC4762F1018E25D607BCBC5E29249974FEEB62`，Authenticode `NotSigned`。仅验证生成，未做干净机安装/卸载。
 - 本机只读确认过 Desktop 配置和实例路径；未进行写入、停机、配置修改或真实生成。
 
 ## 下一步（按安全依赖顺序）
