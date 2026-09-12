@@ -11,9 +11,9 @@
 ## Git 与提交边界
 
 - A–F 后端基础已独立提交：`7c539f4 feat: add ComfyUI resource foundations`。
-- v0.0.3 源码与交接基线分别在 `ac82558`、`1d7192e`；版本号修正将以独立提交保留。
+- v0.0.3 源码候选基线为 `ac82558`，版本号修正为 `7b664ab`，安装器证据修正为 `3e8041a`；发布后交接记录为 `2fc6de4`。已发布标签 `v0.0.3` 固定指向 `3e8041a`，不得移动。
 - `.workbuddy/` 已在 `.gitignore`，不得提交。
-- 已推送 `main`，发布标签 `v0.0.3` 与 [GitHub Release](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.3)；安装器为 `NotSigned`，不能声称已签名。
+- `main` 已推送至 `origin`；发布标签 `v0.0.3` 与 [GitHub Release](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.3) 已于北京时间 2026-09-12 11:41 发布，均非草稿/预发布；安装器为 `NotSigned`，不能声称已签名。
 
 ## 当前实现
 
@@ -39,7 +39,7 @@
 
 - 锁定还原、Debug 与 Release 均为 **101/101**，`git diff --check` 通过。
 - 本地安装器：`artifacts/installer/ComfyUI-FlowPack-0.0.3-Setup.exe`，74,387,576 字节，SHA-256 `175DFC33E1DC6B9FDF63F6013EDC4762F1018E25D607BCBC5E29249974FEEB62`，Authenticode `NotSigned`。仅验证生成，未做干净机安装/卸载。
-- 远程资产：[ComfyUI-FlowPack-0.0.3-Setup.exe](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/download/v0.0.3/ComfyUI-FlowPack-0.0.3-Setup.exe)（74,387,576 字节）与 [SHA256SUMS.txt](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/download/v0.0.3/SHA256SUMS.txt)（99 字节）；Release 非草稿、非预发布。
+- 远程资产：[ComfyUI-FlowPack-0.0.3-Setup.exe](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/download/v0.0.3/ComfyUI-FlowPack-0.0.3-Setup.exe)（74,387,576 字节）与 [SHA256SUMS.txt](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/download/v0.0.3/SHA256SUMS.txt)（99 字节）。已于 2026-09-12 复读远程 `SHA256SUMS.txt`，内容与上述 SHA-256 和文件名一致；未重新下载完整 EXE 做端到端哈希。
 - 本机只读确认过 Desktop 配置和实例路径；未进行写入、停机、配置修改或真实生成。
 
 ## 下一步（按安全依赖顺序）
