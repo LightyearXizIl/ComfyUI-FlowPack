@@ -12,7 +12,7 @@ public sealed record StagedNativePackage(string RootPath, int FileCount, long Un
 public sealed class NativePackageStagingService
 {
     public const int DefaultMaximumEntries = 10_000;
-    public const long DefaultMaximumUncompressedBytes = 20L * 1024 * 1024 * 1024;
+    public const long DefaultMaximumUncompressedBytes = long.MaxValue;
 
     public async Task<StagedNativePackage> StageAsync(
         string zipPath,
@@ -29,6 +29,8 @@ public sealed class NativePackageStagingService
 
         var root = Path.GetFullPath(stagingRoot);
         Directory.CreateDirectory(root);
+        maximumUncompressedBytes = Math.Min(maximumUncompressedBytes, Math.Max(0,
+            new DriveInfo(Path.GetPathRoot(root)!).AvailableFreeSpace - 64L * 1024 * 1024));
         var temporary = Path.Combine(root, ".incoming-" + Guid.NewGuid().ToString("N"));
         var final = Path.Combine(root, "package-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temporary);
@@ -49,7 +51,7 @@ public sealed class NativePackageStagingService
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 EnsureSafeEntry(entry, paths);
-                if (entry.FullName.EndsWith("/", StringComparison.Ordinal)) continue;
+                if (entry.FullName.Replace('\\', '/').EndsWith("/", StringComparison.Ordinal)) continue;
 
                 totalBytes = checked(totalBytes + entry.Length);
                 if (totalBytes > maximumUncompressedBytes)
@@ -61,7 +63,20 @@ public sealed class NativePackageStagingService
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                 await using var source = entry.Open();
                 await using var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, useAsync: true);
-                await source.CopyToAsync(output, cancellationToken);
+                var buffer = new byte[131072];
+                long written = 0;
+                uint crc = uint.MaxValue;
+                int read;
+                while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
+                {
+                    written = checked(written + read);
+                    if (written > entry.Length || totalBytes - entry.Length + written > maximumUncompressedBytes)
+                        throw new InvalidDataException("实际解压大小超过声明值或磁盘预算。");
+                    crc = UpdateCrc(crc, buffer, read);
+                    await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                }
+                if (written != entry.Length || ~crc != entry.Crc32)
+                    throw new InvalidDataException("ZIP 条目长度或 CRC 校验失败：" + entry.FullName);
                 files++;
             }
 
@@ -107,6 +122,7 @@ public sealed class NativePackageStagingService
 
     private static bool IsReservedWindowsName(string segment)
     {
+        if (segment.EndsWith(' ') || segment.EndsWith('.') || segment.IndexOfAny(['<', '>', '"', '|', '?', '*']) >= 0) return true;
         var name = Path.GetFileNameWithoutExtension(segment).TrimEnd(' ', '.');
         if (name.Equals("CON", StringComparison.OrdinalIgnoreCase) ||
             name.Equals("PRN", StringComparison.OrdinalIgnoreCase) ||
@@ -115,5 +131,17 @@ public sealed class NativePackageStagingService
         return name.Length == 4 &&
                ((name.StartsWith("COM", StringComparison.OrdinalIgnoreCase) || name.StartsWith("LPT", StringComparison.OrdinalIgnoreCase)) &&
                 name[3] is >= '1' and <= '9');
+    }
+
+    private static readonly uint[] CrcTable = Enumerable.Range(0, 256).Select(i =>
+    {
+        uint value = (uint)i;
+        for (var bit = 0; bit < 8; bit++) value = (value & 1) != 0 ? 0xEDB88320U ^ (value >> 1) : value >> 1;
+        return value;
+    }).ToArray();
+    private static uint UpdateCrc(uint crc, byte[] buffer, int count)
+    {
+        for (var i = 0; i < count; i++) crc = CrcTable[(crc ^ buffer[i]) & 255] ^ (crc >> 8);
+        return crc;
     }
 }

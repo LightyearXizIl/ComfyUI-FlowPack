@@ -28,6 +28,22 @@ public sealed class ThemePreferenceStore
 
     public string FilePath { get; }
 
+    public ThemeDefinition? Load()
+    {
+        if (!File.Exists(FilePath)) return null;
+        try
+        {
+            var theme = JsonSerializer.Deserialize<ThemeDefinition>(File.ReadAllText(FilePath), SerializerOptions)
+                ?? throw new InvalidDataException("主题文件为空或格式无效。");
+            EnsureValid(theme);
+            return theme;
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidDataException("主题文件不是有效的 JSON。", exception);
+        }
+    }
+
     public async Task<ThemeDefinition?> LoadAsync(CancellationToken cancellationToken = default) =>
         File.Exists(FilePath)
             ? await ReadAsync(FilePath, cancellationToken)

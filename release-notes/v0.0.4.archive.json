@@ -1,0 +1,11 @@
+{
+  "kind": "binary-archive",
+  "version": "0.0.4",
+  "installerFile": "ComfyUI-FlowPack-0.0.4-Setup.exe",
+  "installerBytes": 74855949,
+  "installerSha256": "AE06D3C1CA8101CD826868C56E1494E682E4CE71AB8AD06C7834ABC3AFFDCB3F",
+  "originalBuildBaseCommit": "3aa5528691bea25c2d9f31b9125b74533865df8d",
+  "originalBuildHadUncommittedChanges": true,
+  "completeOriginalSourceSnapshotAvailable": false,
+  "notes": "Preserved local installer, not rebuilt. The archive tag records provenance; its automatic source archive is not the complete original installer source. Current implementation is published as v0.0.5."
+}

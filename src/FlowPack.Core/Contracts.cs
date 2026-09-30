@@ -14,7 +14,7 @@ public sealed record PackageManifest(string Id, string Name, string Version, IRe
 
 public sealed record PackageAuthor(string Name, string? Url);
 public sealed record WorkflowEntry(string Id, string RelativePath, bool IsEntryPoint = true);
-public enum WorkflowFormat { UiV04, UiV10, Api, Unknown }
+public enum WorkflowFormat { UiV04, UiV10, Api, Unknown, UiUnversioned }
 public sealed record WorkflowDocument(string Id, string DisplayName, WorkflowFormat Format, string RawJson);
 public sealed record PackageDraft(
     string Id,
@@ -26,7 +26,13 @@ public sealed record PackageDraft(
     string? AuthorUrl,
     string Source,
     DistributionDeclaration Distribution,
-    int CurrentStep);
+    int CurrentStep)
+{
+    public string? WorkflowSelectionJson { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public IReadOnlyList<string> WorkflowIds => WorkflowSelectionJson is null ? WorkflowId is null ? [] : [WorkflowId] :
+        System.Text.Json.JsonSerializer.Deserialize<string[]>(WorkflowSelectionJson) ?? [];
+}
 public enum DistributionDeclaration { Unspecified, OnlineOnly, OfflineComplete, OfflinePartial }
 
 public sealed record ResourceEntry(string Id, string Name, ResourceKind Kind, long SizeBytes, string? Sha256, string? SourceUrl)

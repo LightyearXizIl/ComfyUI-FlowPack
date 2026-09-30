@@ -15,6 +15,21 @@ public sealed class LibraryBindingStore
 
     public string FilePath { get; }
 
+    // Startup runs on the WPF dispatcher. Never block it waiting for an async continuation.
+    public LibraryBinding? Load()
+    {
+        if (!File.Exists(FilePath)) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<LibraryBinding>(File.ReadAllText(FilePath))
+                ?? throw new InvalidDataException("资源库关联文件为空或格式无效。");
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidDataException("资源库关联文件不是有效的 JSON。", exception);
+        }
+    }
+
     public async Task<LibraryBinding?> LoadAsync(CancellationToken cancellationToken = default)
     {
         if (!File.Exists(FilePath)) return null;

@@ -22,6 +22,7 @@ public sealed record ComfyDesktopLocation(
     string? PythonPath,
     DateTimeOffset InspectedAt)
 {
+    public InstanceDescriptor? Instance { get; init; }
     public bool HasAnyAssetDirectory =>
         ModelsDirectory is not null || CustomNodesDirectory is not null || WorkflowsDirectory is not null;
 }
@@ -36,11 +37,42 @@ public interface IDesktopPathProvider
     string LocalApplicationData { get; }
     string RoamingApplicationData { get; }
     string MyDocuments { get; }
+    string UserProfile => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    string SystemDrive => Path.GetPathRoot(Environment.SystemDirectory)!;
     IReadOnlyList<string> GetProcessModulePaths(string processName);
+    IReadOnlyList<string> GetRegisteredDesktopExecutables() => [];
 }
 
 public sealed class EnvironmentDesktopPathProvider : IDesktopPathProvider
 {
+    public IReadOnlyList<string> GetRegisteredDesktopExecutables()
+    {
+        if (!OperatingSystem.IsWindows()) return [];
+        var result = new List<string>();
+        foreach (var hive in new[] { Microsoft.Win32.RegistryHive.CurrentUser, Microsoft.Win32.RegistryHive.LocalMachine })
+        foreach (var view in new[] { Microsoft.Win32.RegistryView.Registry64, Microsoft.Win32.RegistryView.Registry32 })
+        {
+            try
+            {
+                using var key = Microsoft.Win32.RegistryKey.OpenBaseKey(hive, view);
+                using var uninstall = key.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall");
+                if (uninstall is null) continue;
+                foreach (var name in uninstall.GetSubKeyNames())
+                {
+                    using var app = uninstall.OpenSubKey(name);
+                    if (app?.GetValue("DisplayName") is not string display || !display.StartsWith("Comfy Desktop", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (app.GetValue("InstallLocation") is string root && File.Exists(Path.Combine(root, "Comfy Desktop.exe"))) result.Add(Path.Combine(root, "Comfy Desktop.exe"));
+                    if (app.GetValue("DisplayIcon") is string icon)
+                    {
+                        var path = icon.Split(',')[0].Trim('"');
+                        if (File.Exists(path) && Path.GetFileName(path).Equals("Comfy Desktop.exe", StringComparison.OrdinalIgnoreCase)) result.Add(path);
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException) { }
+        }
+        return result.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+    }
     public string LocalApplicationData => Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
     public string RoamingApplicationData => Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
     public string MyDocuments => Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);

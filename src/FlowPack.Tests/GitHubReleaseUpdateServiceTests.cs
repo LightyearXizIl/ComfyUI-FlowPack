@@ -1,5 +1,6 @@
 using System;
 using System.Net.Http;
+using System.IO;
 using FlowPack.App.Services;
 
 namespace FlowPack.Tests;
@@ -40,6 +41,6 @@ public sealed class GitHubReleaseUpdateServiceTests
                   ] }
                   """)));
 
-        Assert.Null(await new GitHubReleaseUpdateService(http, "owner/repo").CheckAsync(new Version(0, 0, 2)));
+        await Assert.ThrowsAsync<InvalidDataException>(() => new GitHubReleaseUpdateService(http, "owner/repo").CheckAsync(new Version(0, 0, 2)));
     }
 }

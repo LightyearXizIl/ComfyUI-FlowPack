@@ -1,46 +1,42 @@
 # ComfyUI FlowPack
 
-ComfyUI FlowPack 是面向 Windows x64 与官方 ComfyUI Desktop 的工作流资源安装和打包工具。
+ComfyUI FlowPack 是面向 Windows x64 与官方 ComfyUI Desktop 的工作流资源管理和打包工具。
 
-## 0.0.3 本地候选状态
+## 0.0.5
 
-`0.0.3` 是未发布的本地候选，不是已验收的正式安装版。目前完成了：
+- 首页、我的资源、导入安装三个主要入口；任务与设置作为全局工具，打包工具归入资源库。
+- 工作流、模型、节点文件夹快捷入口，使用所选实例已登记的真实路径，支持多个目录选择。
+- 深浅主题、中文/英文偏好、资源搜索与分类、独立导出预览，以及固定安装目标和摘要的导入布局。
+- 持久 Worker、任务记录和状态动作；工作流、模型、节点资源扫描，原生 ZIP 与旧清单导入导出。
+- 在线依赖来源、经 SHA-256 校验的暂存下载、实际内容复用核对，以及部署计划、恢复和安装后重新检查。
+- GitHub Release 更新检查、下载安装器、校验及独立引导交接。
 
-- WPF 桌面壳层及首页、资源库、打包、安装、任务、设置六个区域；
-- 简体中文/英文运行时切换与语言偏好保存；
-- 作者 LightyearXizIl、GitHub 仓库和脱敏诊断摘要导出；
-- schema v6 资源库、迁移前 SQLite 备份、主题配置、Worker IPC 和 SHA-256 校验的 staging 下载；
-- `.cpack`/展开目录/原生 ZIP 识别、工作流原文保留、草稿交换及不完整工作流包导出；
-- 资源包、工作流、模型与节点列表筛选，以及真实持久化任务显示；
-- 受路径、链接、保留名、重复项、展开容量限制保护的 ZIP staging；
-- 只读 Desktop 适配与不可执行的冻结安装计划；GitHub Release 更新元数据检查；
-- Debug/Release 自动化测试、锁定 SDK/依赖和 Windows 安装器构建链路。
+[发布与下载](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases) · [0.0.5 更新说明](release-notes/v0.0.5.md) · [页面规划](docs/UI_LAYOUT_REPLAN_2026-09-30.md)
 
-真实 ComfyUI Desktop 写入、配置备份/恢复、L1–L4 验证、离线完整包、暂停续传、升级卸载和安装器干净机生命周期仍待隔离实机验证。安装入口保持禁用，当前候选不能用于向真实 ComfyUI 环境部署资源。
+## 使用范围与限制
+
+正式 ComfyUI Desktop 自动部署按版本、布局和能力验收控制；目前生产资格表为空，实际环境中受门禁限制的安装保持不可执行。资源检测、整理、导入暂存和导出可继续使用。
+
+完整软件自身升级、数据保留、干净机安装/卸载、系统多 DPI 和实际 Explorer 交互仍待实机验收。安装器未签名。专项测试需要明确提供隔离夹具，常规回归不会自动操作真实 ComfyUI 环境。
+
+0.0.4 按原本地安装包补发，未重新构建；当时完整源码快照不可精确回溯，详见 [归档说明](release-notes/v0.0.4.md)。当前完整实现与重绘后的源码保存在 0.0.5。
 
 ## 构建
 
-要求：
-
-- Windows x64；
-- .NET SDK 10.0.112；
-- Inno Setup 6（只在生成安装器时需要）。
+要求 Windows x64、.NET SDK 10.0.112；生成安装器还需 Inno Setup 6。
 
 ```powershell
 dotnet restore .\FlowPack.sln --locked-mode
 dotnet test .\FlowPack.sln -c Release --no-restore
-.\build\Build-Release.ps1 -Version 0.0.3
+.\build\Build-Release.ps1 -Version 0.0.5
 ```
 
-安装器输出到 `artifacts/installer/`。
+安装器输出到 `artifacts/installer/`。发布脚本运行锁定还原、测试、自包含 App/Worker 发布、安装器编译，并生成三项 SHA-256 清单。标签工作流为常规版本重新构建；带 `.archive.json` 的历史原包版本仅核对归档声明，不替换旧安装包。
 
 ## 文档
 
-- `IMPLEMENTATION_PLAN.md`：完整实施阶段与安全边界；
+- `HANDOFF.md`：当前证据、发布状态和待验收事项；
+- `IMPLEMENTATION_PLAN.md`：实施阶段与安全边界；
 - `REQUIREMENTS_ACCEPTANCE.md`：需求和验收追踪；
 - `FRONTEND_REFERENCE.md`：界面视觉与交互基准；
 - `VERSIONING.md`：满 10 进 1 的版本规则。
-
-## 已知限制
-
-0.0.3 已推送、打标签并创建 GitHub Release；安装器未进行干净机安装/卸载验收，且没有代码签名。Windows 可能显示未知发布者提示。

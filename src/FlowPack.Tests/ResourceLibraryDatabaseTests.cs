@@ -133,7 +133,7 @@ public sealed class ResourceLibraryDatabaseTests : IDisposable
             await using var command = connection.CreateCommand();
             command.CommandText = """
                 CREATE TABLE SchemaInfo (name TEXT NOT NULL PRIMARY KEY, value TEXT NOT NULL);
-                INSERT INTO SchemaInfo (name, value) VALUES ('schema_version', '7');
+                INSERT INTO SchemaInfo (name, value) VALUES ('schema_version', '8');
                 """;
             await command.ExecuteNonQueryAsync();
         }
@@ -152,7 +152,7 @@ public sealed class ResourceLibraryDatabaseTests : IDisposable
     }
 
     [Fact]
-    public async Task Version_five_library_is_backed_up_before_the_schema_six_upgrade()
+    public async Task Version_five_library_is_backed_up_before_the_schema_seven_upgrade()
     {
         var databasePath = Path.Combine(_libraryPath, "state", "flowpack.db");
         Directory.CreateDirectory(Path.GetDirectoryName(databasePath)!);
@@ -173,7 +173,7 @@ public sealed class ResourceLibraryDatabaseTests : IDisposable
         await verification.OpenAsync();
         await using var versionCommand = verification.CreateCommand();
         versionCommand.CommandText = "SELECT value FROM SchemaInfo WHERE name = 'schema_version';";
-        Assert.Equal("6", (string?)await versionCommand.ExecuteScalarAsync());
+        Assert.Equal("7", (string?)await versionCommand.ExecuteScalarAsync());
     }
 
     [Fact]

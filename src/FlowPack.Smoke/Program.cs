@@ -5,17 +5,48 @@ using System.Text.Json;
 using FlowPack.App;
 using FlowPack.Core;
 using FlowPack.Infrastructure;
+using FlowPack.ComfyUI;
 
 namespace FlowPack.Smoke;
 
 internal static class Program
 {
     [STAThread]
-    private static int Main()
+    private static int Main(string[] args)
     {
-        var app = new FlowPack.App.App { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+        if (args is ["--acceptance-update-coordination"])
+            return UpdateCoordinationAcceptance.RunAsync().GetAwaiter().GetResult();
+        if (args is ["--acceptance-update-child", var updateRoot, var updateRole])
+            return UpdateCoordinationAcceptance.ChildAsync(updateRoot, updateRole).GetAwaiter().GetResult();
+        if (args is ["--acceptance-crash-recovery"])
+            return RecoveryCrashAcceptance.RunAsync().GetAwaiter().GetResult();
+        if (args is ["--acceptance-crash-child", var crashRoot, var crashPhase])
+            return RecoveryCrashAcceptance.ChildAsync(crashRoot, crashPhase).GetAwaiter().GetResult();
+        if (args is ["--acceptance-ui" or "--acceptance-worker", var scopeFile, var runId])
+            return AcceptanceHost.Run(args[0], scopeFile, runId);
+        if (args is ["--acceptance-inspect", var inspectScope])
+        {
+            var scope = AcceptanceScope.Load(inspectScope);
+            var instances = new DesktopInstanceDiscovery(configurationRoot: scope.DesktopProfile).DiscoverAsync().GetAwaiter().GetResult();
+            foreach (var instance in instances) scope.ValidateInstance(instance);
+            Console.WriteLine(JsonSerializer.Serialize(instances.Select(instance => new { instance, capability = scope.Evaluate(instance, false) })));
+            return instances.Count == scope.InstanceIds.Count ? 0 : 1;
+        }
+        if (args.Contains("--inspect-desktop"))
+        {
+            var instances = new DesktopInstanceDiscovery().DiscoverAsync().GetAwaiter().GetResult();
+            foreach (var instance in instances)
+            {
+                var inventory = new ResourceInventoryService().ScanAsync(instance).GetAwaiter().GetResult();
+                Console.WriteLine(JsonSerializer.Serialize(new { instance, workflows = inventory.Resources.Count(x => x.Kind == ResourceKind.Workflow),
+                    models = inventory.Resources.Count(x => x.Kind == ResourceKind.Model), nodePackages = inventory.Resources.Count(x => x.Kind == ResourceKind.CustomNode),
+                    coreNodeTypes = inventory.CoreNodeTypes.Count, inventory.Issues }));
+            }
+            return instances.Count > 0 ? 0 : 1;
+        }
+        var app = new FlowPack.App.App { ShutdownMode = ShutdownMode.OnExplicitShutdown, SuppressAutomaticWindow = true };
         app.InitializeComponent();
-        var window = new MainWindow();
+        var window = new MainWindow(new ShellViewModel());
         if (window.DataContext is not ShellViewModel || window.Title != "ComfyUI FlowPack")
         {
             Console.Error.WriteLine("FlowPack WPF shell did not initialize as expected.");
@@ -105,7 +136,7 @@ internal static class Program
             if (response is null || !response.Succeeded || !response.Payload!.Value.GetProperty("taskStoreAttached").GetBoolean() || response.Payload.Value.GetProperty("taskCount").GetInt32() != 1)
             {
                 var responseText = response is null ? "<no response>" : JsonSerializer.Serialize(response);
-                var errorText = worker.StandardError.ReadToEnd();
+                var errorText = worker.HasExited ? worker.StandardError.ReadToEnd() : "Worker is still running";
                 Console.Error.WriteLine($"Worker did not return the persisted task snapshot status. Response: {responseText}; stderr: {errorText}");
                 return false;
             }

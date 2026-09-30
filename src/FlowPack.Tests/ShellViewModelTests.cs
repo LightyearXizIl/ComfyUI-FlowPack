@@ -8,7 +8,8 @@ public sealed class ShellViewModelTests
     [Fact]
     public void Startup_uses_unchecked_empty_state()
     {
-        var viewModel = new ShellViewModel();
+        var viewModel = new ShellViewModel(libraryBindingStore: new FlowPack.Infrastructure.LibraryBindingStore(
+            System.IO.Path.Combine(System.IO.Path.GetTempPath(), "flowpack-unbound-" + Guid.NewGuid().ToString("N"), "binding.json")));
 
         Assert.Equal(FlowPage.Home, viewModel.CurrentPage);
         Assert.Equal("●  尚未检查环境", viewModel.StatusNotice);
@@ -20,7 +21,7 @@ public sealed class ShellViewModelTests
     [Theory]
     [InlineData(FlowPage.Home, true, false, false, false, false)]
     [InlineData(FlowPage.Library, false, true, false, false, false)]
-    [InlineData(FlowPage.Packaging, false, false, true, false, false)]
+    [InlineData(FlowPage.Packaging, false, true, true, false, false)]
     [InlineData(FlowPage.Install, false, false, false, true, false)]
     [InlineData(FlowPage.Tasks, false, false, false, false, true)]
     [InlineData(FlowPage.Settings, false, false, false, false, false)]
@@ -40,6 +41,21 @@ public sealed class ShellViewModelTests
         Assert.Equal(install, viewModel.IsInstallContext);
         Assert.Equal(tasks, viewModel.IsTasksContext);
         Assert.False(string.IsNullOrWhiteSpace(viewModel.PageTitle));
+    }
+
+    [Fact]
+    public void Resource_category_links_select_the_correct_tab_and_keep_it_when_returning()
+    {
+        var vm = new ShellViewModel();
+        foreach (var (route, tab) in new[] { ("Models", 1), ("Nodes", 2), ("Workflows", 0) })
+        {
+            vm.NavigateCommand.Execute(route);
+            Assert.Equal(FlowPage.Library, vm.CurrentPage);
+            Assert.Equal(tab, vm.LibraryTabIndex);
+            vm.NavigateCommand.Execute("Home");
+            vm.NavigateCommand.Execute("Library");
+            Assert.Equal(tab, vm.LibraryTabIndex);
+        }
     }
 
     [Fact]
@@ -70,7 +86,7 @@ public sealed class ShellViewModelTests
 
         Assert.Equal("LightyearXizIl", viewModel.AuthorName);
         Assert.Equal("https://github.com/LightyearXizIl/ComfyUI-FlowPack", viewModel.RepositoryUrl);
-        Assert.Equal("0.0.3", viewModel.ApplicationVersion);
+        Assert.Equal("0.0.5", viewModel.ApplicationVersion);
         Assert.True(viewModel.OpenRepositoryCommand.CanExecute(null));
         Assert.True(viewModel.CopyRepositoryUrlCommand.CanExecute(null));
         Assert.True(viewModel.ExportDiagnosticsCommand.CanExecute(null));

@@ -68,16 +68,19 @@ public sealed class PackageImportReader
     {
         var root = Path.GetFullPath(source);
         var manifestPath = Path.Combine(root, "manifest.json");
+        ResourceInstallationService.EnsureNoLinks(manifestPath);
         if (!File.Exists(manifestPath)) throw new InvalidDataException("展开目录根目录必须包含 manifest.json。");
         var manifest = await _manifestReader.ReadAsync(manifestPath, cancellationToken);
         EnsureEntryWorkflowsPresent(manifest, path =>
         {
             var workflowPath = Path.GetFullPath(Path.Combine(root, path));
+            ResourceInstallationService.EnsureNoLinks(workflowPath);
             return IsSameOrDescendant(workflowPath, root) && File.Exists(workflowPath);
         });
         foreach (var resource in manifest.Resources.Where(resource => resource.PackagePath is not null))
         {
             var payloadPath = Path.GetFullPath(Path.Combine(root, resource.PackagePath!));
+            ResourceInstallationService.EnsureNoLinks(payloadPath);
             if (!IsSameOrDescendant(payloadPath, root) || !File.Exists(payloadPath))
             {
                 throw new InvalidDataException($"展开目录缺少资源载荷：{resource.PackagePath}");

@@ -6,19 +6,14 @@
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" /><RowDefinition Height="28" /><RowDefinition Height="Auto" /><RowDefinition Height="18" /><RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
-    <Grid>
-      <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-      <StackPanel>
-        <Button Content="← 返回资源包" Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AccentBrush}" Padding="0" HorizontalAlignment="Left" Cursor="Hand" Command="{Binding NavigateCommand}" CommandParameter="Packages" />
-        <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}" Margin="0,10,0,0" />
-        <TextBlock Text="{Binding SelectedPackageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" />
-      </StackPanel>
-      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Bottom">
-        <Button Content="{Binding DownloadPackageButtonText}" Style="{StaticResource SecondaryButton}" Margin="0,0,10,0" Command="{Binding DownloadPackageCommand}" IsEnabled="{Binding HasDownloadablePackage}" ToolTip="仅下载并校验，不部署到 ComfyUI；需要每项资源都有来源和 SHA-256" />
-        <Button Content="开始安装" Style="{StaticResource PrimaryButton}" IsEnabled="False" Command="{Binding StartInstallCommand}" ToolTip="选择并检查真实 ComfyUI 环境后才能生成安装计划" />
-      </StackPanel>
-    </Grid>
-
+    <StackPanel>
+      <TextBlock Text="旧清单预览" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Text="{Binding SelectedPackageSubtitle}" Style="{StaticResource SubtleText}" Margin="0,8,0,12"/>
+      <WrapPanel>
+        <Button Content="{Binding DownloadPackageButtonText}" Command="{Binding DownloadPackageCommand}" IsEnabled="{Binding HasDownloadablePackage}" Margin="0,0,8,8" ToolTip="仅下载并校验，不部署到 ComfyUI"/>
+        <Button Content="开始安装" IsEnabled="False" Command="{Binding StartInstallCommand}" Margin="0,0,0,8" ToolTip="旧清单安装仍未具备环境验证条件"/>
+      </WrapPanel>
+    </StackPanel>
     <Border Grid.Row="2">
       <Border.Style>
         <Style TargetType="Border" BasedOn="{StaticResource EmptyStateCard}">

@@ -11,7 +11,7 @@ namespace FlowPack.Infrastructure;
 /// </summary>
 public sealed class ResourceLibraryDatabase : IAsyncDisposable
 {
-    private const int CurrentSchemaVersion = 6;
+    private const int CurrentSchemaVersion = 7;
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -60,6 +60,8 @@ public sealed class ResourceLibraryDatabase : IAsyncDisposable
                 }
             }
             await ExecuteAsync(connection, """
+                CREATE TABLE IF NOT EXISTS WorkerJobs (id TEXT PRIMARY KEY, json TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS DraftSelections (draft_id TEXT PRIMARY KEY, workflow_ids_json TEXT NULL);
                 CREATE TABLE IF NOT EXISTS SchemaInfo (
                     name TEXT NOT NULL PRIMARY KEY,
                     value TEXT NOT NULL
@@ -416,9 +418,12 @@ public sealed class ResourceLibraryDatabase : IAsyncDisposable
                     distribution = excluded.distribution,
                     current_step = excluded.current_step,
                     updated_at_utc = excluded.updated_at_utc;
+                INSERT INTO DraftSelections (draft_id, workflow_ids_json) VALUES ($id, $selection)
+                ON CONFLICT(draft_id) DO UPDATE SET workflow_ids_json = excluded.workflow_ids_json;
                 """;
             command.Parameters.AddWithValue("$id", draft.Id);
             command.Parameters.AddWithValue("$workflowId", (object?)draft.WorkflowId ?? DBNull.Value);
+            command.Parameters.AddWithValue("$selection", (object?)draft.WorkflowSelectionJson ?? DBNull.Value);
             command.Parameters.AddWithValue("$name", draft.Name);
             command.Parameters.AddWithValue("$version", draft.Version);
             command.Parameters.AddWithValue("$description", draft.Description);
@@ -442,7 +447,8 @@ public sealed class ResourceLibraryDatabase : IAsyncDisposable
         await using var connection = await OpenConnectionAsync(cancellationToken);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT draft_id, workflow_id, name, version, description, author_name, author_url, source, distribution, current_step, updated_at_utc
+            SELECT draft_id, workflow_id, name, version, description, author_name, author_url, source, distribution, current_step, updated_at_utc,
+                (SELECT workflow_ids_json FROM DraftSelections WHERE DraftSelections.draft_id = PackageDrafts.draft_id)
             FROM PackageDrafts
             ORDER BY updated_at_utc DESC;
             """;
@@ -465,7 +471,7 @@ public sealed class ResourceLibraryDatabase : IAsyncDisposable
                     reader.IsDBNull(6) ? null : reader.GetString(6),
                     reader.GetString(7),
                     distribution,
-                    reader.GetInt32(9)),
+                    reader.GetInt32(9)) { WorkflowSelectionJson = reader.IsDBNull(11) ? null : reader.GetString(11) },
                 DateTimeOffset.Parse(reader.GetString(10), null, System.Globalization.DateTimeStyles.RoundtripKind)));
         }
         return drafts;
@@ -555,6 +561,81 @@ public sealed class ResourceLibraryDatabase : IAsyncDisposable
     {
         _writeLock.Dispose();
         return ValueTask.CompletedTask;
+    }
+
+    public async Task SaveJobAsync(string id, string json, CancellationToken token = default)
+    {
+        await InitializeAsync(token);
+        await _writeLock.WaitAsync(token);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(token);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "INSERT INTO WorkerJobs(id,json) VALUES($id,$json) ON CONFLICT(id) DO UPDATE SET json=excluded.json";
+            command.Parameters.AddWithValue("$id", id); command.Parameters.AddWithValue("$json", json);
+            await command.ExecuteNonQueryAsync(token);
+        }
+        finally { _writeLock.Release(); }
+    }
+
+    public async Task SaveImportSessionAsync(ImportSessionState session, CancellationToken token = default)
+    {
+        await InitializeAsync(token);
+        await _writeLock.WaitAsync(token);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(token);
+            await using var command = connection.CreateCommand();
+            // An optional metadata value in the existing schema, not a schema migration.
+            command.CommandText = "INSERT INTO SchemaInfo(name,value) VALUES('import_session_v1',$json) ON CONFLICT(name) DO UPDATE SET value=excluded.value";
+            command.Parameters.AddWithValue("$json", JsonSerializer.Serialize(session));
+            await command.ExecuteNonQueryAsync(token);
+        }
+        finally { _writeLock.Release(); }
+    }
+
+    public async Task SaveDownloadAndImportSessionAsync(WorkerJob job, ImportSessionState session, CancellationToken token = default)
+    {
+        await InitializeAsync(token);
+        await _writeLock.WaitAsync(token);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(token);
+            using var transaction = connection.BeginTransaction();
+            await using var command = connection.CreateCommand(); command.Transaction = transaction;
+            command.CommandText = "INSERT INTO WorkerJobs(id,json) VALUES($id,$json)";
+            command.Parameters.AddWithValue("$id", job.Id); command.Parameters.AddWithValue("$json", JsonSerializer.Serialize(job));
+            await command.ExecuteNonQueryAsync(token);
+            command.Parameters.Clear();
+            command.CommandText = "INSERT INTO SchemaInfo(name,value) VALUES('import_session_v1',$json) ON CONFLICT(name) DO UPDATE SET value=excluded.value";
+            command.Parameters.AddWithValue("$json", JsonSerializer.Serialize(session));
+            await command.ExecuteNonQueryAsync(token);
+            await transaction.CommitAsync(token);
+        }
+        finally { _writeLock.Release(); }
+    }
+
+    public async Task<ImportSessionState?> LoadImportSessionAsync(CancellationToken token = default)
+    {
+        await InitializeAsync(token);
+        await using var connection = await OpenConnectionAsync(token);
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT value FROM SchemaInfo WHERE name='import_session_v1'";
+        var json = await command.ExecuteScalarAsync(token) as string;
+        if (json is null) return null;
+        var session = JsonSerializer.Deserialize<ImportSessionState>(json) ?? throw new InvalidDataException("导入会话为空，请重新导入文件。");
+        if (session.Version != 1) throw new InvalidDataException("导入会话来自不支持的版本，请重新检查。");
+        return session;
+    }
+
+    public async Task<IReadOnlyList<string>> LoadJobsAsync(CancellationToken token = default)
+    {
+        await InitializeAsync(token);
+        await using var connection = await OpenConnectionAsync(token);
+        await using var command = connection.CreateCommand(); command.CommandText = "SELECT json FROM WorkerJobs";
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var result = new List<string>(); while (await reader.ReadAsync(token)) result.Add(reader.GetString(0));
+        return result;
     }
 
     private async Task<SqliteConnection> OpenConnectionAsync(CancellationToken cancellationToken)

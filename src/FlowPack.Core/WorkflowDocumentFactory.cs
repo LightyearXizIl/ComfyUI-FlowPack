@@ -20,14 +20,23 @@ public static class WorkflowDocumentFactory
 
     public static WorkflowFormat DetectFormat(JsonElement root)
     {
+        if (root.ValueKind != JsonValueKind.Object) return WorkflowFormat.Unknown;
         if (root.TryGetProperty("nodes", out var nodes) && nodes.ValueKind == JsonValueKind.Array)
         {
+            if (nodes.EnumerateArray().Any(x => x.ValueKind != JsonValueKind.Object ||
+                !x.TryGetProperty("id", out var id) || id.ValueKind is not (JsonValueKind.String or JsonValueKind.Number) ||
+                !x.TryGetProperty("type", out var nodeType) || nodeType.ValueKind != JsonValueKind.String ||
+                string.IsNullOrWhiteSpace(nodeType.GetString()))) return WorkflowFormat.Unknown;
             if (root.TryGetProperty("version", out var version))
             {
                 var text = version.ValueKind == JsonValueKind.String ? version.GetString() : version.GetRawText();
                 if (text is "0.4" or "0.4.0") return WorkflowFormat.UiV04;
                 if (text is "1" or "1.0" or "1.0.0") return WorkflowFormat.UiV10;
             }
+            else if (nodes.GetArrayLength() > 0 && root.TryGetProperty("links", out var links) && links.ValueKind == JsonValueKind.Array &&
+                nodes.EnumerateArray().All(x => x.ValueKind == JsonValueKind.Object && x.TryGetProperty("id", out _) &&
+                    x.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.String))
+                return WorkflowFormat.UiUnversioned;
             return WorkflowFormat.Unknown;
         }
 

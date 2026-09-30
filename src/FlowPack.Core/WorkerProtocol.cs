@@ -4,7 +4,7 @@ namespace FlowPack.Core;
 
 public static class WorkerProtocol
 {
-    public const string Version = "2";
+    public const string Version = "5";
     public const string PingCommand = "ping";
     public const string StatusCommand = "worker.status";
     public const string ListTasksCommand = "task.list";
@@ -32,4 +32,4 @@ public sealed record WorkerResponse(
 
 public sealed record WorkerError(string Code, string Message);
 
-public sealed record DownloadTaskPayload(string SourceUrl, string ExpectedSha256, string FileName);
+public sealed record DownloadTaskPayload(string SourceUrl, string? ExpectedSha256, string FileName);

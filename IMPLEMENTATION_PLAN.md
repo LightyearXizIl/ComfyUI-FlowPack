@@ -1,9 +1,71 @@
 # ComfyUI FlowPack 完整软件执行规划书
 
-文档版本：1.0  
-编制日期：2026-09-11  
-状态：完整实施基线；M0 已实现，M1–M10 仍待实施，不能据此声称完整软件已经完成。  
-当前发布范围：0.0.1 工程预览版，包含 M0 壳层修复、测试与安装器链路，不包含真实 ComfyUI 资源部署能力。
+
+2026-09-12 跨进程更新协调验收：源码专用Smoke新增--acceptance-update-coordination，在每个独立临时范围启动两个真实PersistentWorkerService子进程/独立资源库。正常完成场景PID37928/12912：两边均拒绝更新期间的新任务，首个任务结束后仍等待第二个，模拟安装期间保持协调锁及安装文件写保护，结束后恢复接收任务。取消场景PID5152/40232：取消更新不取消原任务，两子进程正常完成，接收任务能力恢复。两场景通过；结果及拒绝响应在artifacts/acceptance/update-process-coordination/，更新/协调回归7通过（update-coordination-regression.trx）。安装器启动和App退出握手仍用回调替代，未运行真正安装器，不能视为App界面或旧版本升级验收。默认Smoke输出因既有PID26688锁定而构建失败，未终止该进程；改为独立artifacts/acceptance/hosts/update-coordination-current输出后构建0警告0错误并完成测试。本轮仅新增测试宿主，不改产品业务代码或36EA…安装器；常规完整基线仍290/5，生产资格不变。
+
+
+2026-09-12 最新0.0.4候选重建：artifacts/installer/ComfyUI-FlowPack-0.0.4-Setup.exe，74844683字节，SHA256 36EADCD2B83D841C82E0E07957E5BA9462EC602A61425DCF8D1A0A195C38F7A0，NotSigned。已包含安装后预览刷新、本地同内容核对、来源重新预览保留及文件/依赖统计修复；锁定还原、Release290通过/5专项跳过、自包含发布、Inno编译及三项校验清单核验通过，App/Worker基础DLL哈希均E9EC038A9D4C90A608E6DA400453192E73EF7BFADCFCDE53062C9701174895E4，Smoke未打入产品。旧800A…安装器/publish/release.trx保留在artifacts/candidate-history/before-post-install-3f11a7feb28d416782795ddfa8e8f69f。未运行新安装器、未推送/标签/Release；生产资格仍为空。实际新宿主刷新、升级/UI完整矩阵、API JSON侧栏打开兼容性等仍待完成，不能声明全部功能可用。以artifacts/installer/CANDIDATE-NOTES.md为当前包说明；下方“修复未打包/800A最新”为历史状态。
+
+
+2026-09-12 安装完成后预览刷新修复（源码）：ExecuteDeploymentAsync在持久Worker完成后作废旧计划，重新扫描当前实例并生成新预览；检查失败时明确显示“文件已部署，但重新检查失败”，清除旧依赖行和执行计划，不误报安装失败。Worker依赖分析/安装计划使用MergeVerifiedAsync：仅唯一同类别/相对路径本地候选且实际内容哈希相同才移除重复暂存候选；目录逐项核对运行文件集合和哈希，保留本地节点真实加载状态，同名异内容、多候选、跨类别或多余运行文件不自动替代。增加3项合并回归和2项真实NamedPipe/Worker/VM部署回归（成功刷新、部署成功后扫描失败）；完整Release290通过/5专项跳过，artifacts/acceptance/core-completion-audit/post-install-full-final.trx，diff检查通过。测试模型为临时夹具字节，不是实际模型推理；尚未在新宿主进行安装完成后的页面截图验收、尚未重建800A…安装器。原Desktop和生产资格不变，完整升级/UI矩阵仍待完成。
+
+
+2026-09-12 新下载模型实际推理与页面复用通过：computer-use在现有隔离Desktop的upscale (2)测试画布把模型切换为realesr-animevideov3.pth并点击运行，prompt f8f1749a-892a-485c-bd23-35d0e3894f65为success/completed，来源comfyui-frontend；缓存仅2/3（输入及测试节点），模型1、放大4、保存5未缓存。输出C盘隔离output/flowpack_acceptance_00003_.png为32×32，SHA256 2B119E0FBAEB467E25B01725D17CA0B38DFA96AAD1612FB6D5A53A7A32EE11F5。DesktopRuntimeAcceptanceTests新增明确downloaded-model场景，核对已安装FlowPack-download-workflow.json依赖均Present、模型/节点存在、实例绑定及真实输出；最终专项1通过0跳过，artifacts/acceptance/core-completion-audit/downloaded-model-runtime-final.trx。history/runtime证据位于fixture/desktop-gui-evidence/target-7d2c0a595981405a959cccdae3535231/上述prompt目录。此运行由既有画布改模型完成，不冒称从侧栏成功打开已安装API JSON；文件原文未改，输出前缀沿用旧画布。
+
+同一download-current FlowPack窗口重新通过文件对话框打开D:/16054/Documents/FlowPack-download-workflow.json，页面将新模型、FlowPackAcceptancePass和fixture.png全部列为本地可复用；预览新增0/复用1/0B，点击下载全部反馈“没有已确认来源的缺失依赖。”未再次安装或下载。另发现待修问题：安装成功后原预览不自动刷新，仍显示旧新增计数和已暂存状态，重新导入才正确；不能把本次重新导入复用通过视为该状态刷新缺陷已修复。生产资格及原Desktop不变；完整升级、UI矩阵等仍未完成。
+
+
+2026-09-12 实际 pip 部分安装取消验收：新增 PythonInterruptedInstallIntegrationTests，在全新独立 venv 中离线安装本地无安装钩子的测试 wheel，检测到真实 pip 解包后取消。计划2277ac2475c84a40960a956b46636a94保留36/2049个文件，原 pip 25.0.1版本不变，Python日志为NeedsRepair；Worker重启两次均生成NeedsReview修复任务、无直接重试动作，后续安装被阻断。专项1通过0跳过（artifacts/acceptance/core-completion-audit/python-interrupted.trx），常规285通过/5专项跳过（python-interrupted-regression.trx）。夹具和部分环境保留在artifacts/acceptance/core-completion-audit/python-interrupted-b18e0e19ecb9414d947890105fa79f56/result.json所指位置。这是主动取消真实pip解包，不是强制终止宿主、断电或Desktop节点Python依赖闭环，不能替代其余恢复验收。未修改原Desktop或生产资格，未重建安装器。
+
+运行记录复核：用户最新“运行了”对应prompt 840f75e4-2f53-4792-9351-1e2bd11c8486，success且无缓存，但使用的是旧RealESRGAN_x2plus.pth，输出flowpack_acceptance_00002_.png已存在。不能计为新realesr-animevideov3.pth运行通过；新模型下载/部署已完成，实际推理仍待验证。
+
+2026-09-12 下载修复后候选重建完成：artifacts/installer/ComfyUI-FlowPack-0.0.4-Setup.exe，74865455字节，SHA256 800AC4CBA34154CA820EE82C77FC853220579169854159DD1F799DDA4D751373，NotSigned。锁定还原、Release285通过/4专项跳过、自包含发布及Inno编译成功；三行校验清单重新核验通过，App/Worker基础DLL一致且Smoke未进入发布。已包含完整计划JSON语义比较和首次导入保留下载来源修复。旧264E…安装器、publish和原release.trx保留在artifacts/candidate-history/before-download-preview-906ec66bd5794766a998e93283f0608c。真实缺失模型页面下载证据见artifacts/acceptance/core-completion-audit/missing-model-ui-download.md；新模型仍仅暂存，待用户对新安装动作确认。未运行产品安装器、未推送或发布，生产DeploymentCapability仍为空，不能视为全部功能验收完成。此前“264E最新/新修复未打包”为历史记录。
+
+2026-09-12 接管目标真实运行通过：用户在官方 Desktop 页面打开已安装工作流并点击运行，prompt_id=3fde9dca-0c75-4f45-a4ce-312373f0887a，history为success/completed=true，comfy_usage_source=comfyui-frontend且execution_cached为空。真实使用FlowPackAcceptancePass、RealESRGAN_x2plus.pth与fixture.png，输出C盘隔离output/flowpack_acceptance_00001_.png，16×16，SHA256 EE0EB484B99A8990783D73A47C5A41A1D1D6684BE5890398E362FA71C272263E。DesktopRuntimeAcceptanceTests对该真实prompt的实例发现/端口身份/节点已加载/依赖全部Present/输出校验1通过0跳过；TRX为artifacts/acceptance/core-completion-audit/adopted-desktop-runtime.trx，history/runtime JSON位于fixture/desktop-gui-evidence/target-7d2c0a595981405a959cccdae3535231/上述prompt_id目录。此前页面导出→页面导入→持久Worker部署→官方接管实例运行的该包链路已取得证据；最后打开和运行由用户完成。仍未完成页面缺失下载、全部故障恢复、更新升级与完整UI矩阵，不据此宣布全部可用或开放生产资格。264E…安装器仍未包含后续计划比较修正。
+
+2026-09-12 隔离安装重试成功：用户明确“继续安装”后，通过 install-current 隔离页面选择 adopted target、打开此前页面导出的 D:\16054\Documents\ComfyUI-resources.zip 并点击安装。当前 run=f160eecd425c492aa7e1284ddd6f0f0f，journal 计划38500f15ffe14380986ad62fa572be61为FilesDeployed，4项均Committed、Error=null；页面任务显示已完成并要求启动目标检查节点与模型。C:\Users\16054\AppData\Local\ComfyUI FlowPack\Acceptance\adopted-4cc5e414 下工作流、RealESRGAN模型、节点源码、输入图片实测哈希全部与导出载荷一致。未在原Desktop部署；未执行Python依赖安装。上文/下文“等待恢复操作、尚未重新安装”为此前状态，已解除。仍未完成该目标的官方Desktop启动/节点加载/模型及工作流运行验证，不能据此开放生产资格或宣布八项全通过；264E…安装器仍不含此次计划比较修正。
+
+2026-09-12 最新状态：用户确认“安装”后，隔离页面实际提交被 Worker 以“安装计划不是本 Worker 生成的原始计划”拒绝；四个目标载荷均未写入。计划比较已改为 JSON 语义一致性校验，仍要求 Worker 留存的完整计划及当前部署资格；新增格式差异/内容篡改/版本变化回归，Release 285通过、4专项跳过（artifacts/acceptance/core-completion-audit/plan-equality-regression.trx）。修正版隔离宿主已启动，但用户随后按 Esc 停止界面操作，尚未重新安装。需要用户明确恢复操作后继续真实闭环。264E…安装器不包含此次比较修正，未重新打包，生产安装资格仍为空。下文相关“当前源码已全部打包”“安装尚未执行/待首次确认”为历史状态。
+
+文档版本：1.1；更新日期：2026-09-12。
+当前开发：0.0.4 本地核心候选；最新发布：0.0.3。整体仍未达到完整软件验收条件。
+
+## 本轮优先范围与实施状态
+
+交付最新状态：已重建包含近期全部源码修正的0.0.4候选，Release274通过/4专项跳过，安装器SHA256 721B2266BD5A85539D735FD8DB15CD580CE57A80A3CE8C3378D6834E0AF6D15E。旧893F…产物完整保留；不运行安装器、不推送或发布。真实Desktop闭环、升级和其他待验收项目仍开放，生产资格为空；下方未重建说法为历史记录。
+
+最新增量：常规273通过/4专项跳过。在线清单“保存来源”页面已连接Worker不可变派生计划/原子会话保存，保留声明校验要求，拒绝过期窗口和已有下载换源。已复核浅深截图，但不是实际下载证据。实际页面ZIP已保存并导入隔离目标，尚未点击安装（待明确确认）；当前893F…候选安装器已构建但未包含后续源码修正。完整Desktop闭环、升级、会话选择/映射恢复等继续开放，下方状态为历史记录。
+
+当前基线更新为常规 **261 通过 / 4 专项默认跳过**。任务侧面板及后台增量刷新已实现；安装/Python 坏日志恢复、共享模型精确复用及首次空会话启动已有回归。损坏安装日志按文件隔离、持久显示问题并阻止新安装。真实页面导出尚停在另存为；双实例安装运行、完整会话映射恢复、全页面主题/DPI 与实际升级仍待验收，安装器仍是旧基线。以下计数为历史记录。
+
+最新关联恢复增量：常规 **232 通过 / 4 专项默认跳过**。Worker 转换计划通过保留任务追溯祖先，继续保留未完成资源的下载关联；独立新导入不沿用旧任务。尚未新增页面闭环或安装器交付。
+
+当前基线：常规 **230 通过 / 4 专项默认跳过**；ZIP64 和隔离 Python 专项本轮另行各通过一次。统一在线页面、导入会话恢复、原子下载关联已接入；会话 Revision 防止旧窗口覆盖，新下载与同计划保存共用锁并保留关联，IPC 更新为 v5。下一步仍为真实页面闭环、完整会话选择/映射恢复、任务侧面板与实际升级验收；下方较早入口状态仅为历史增量，不能作为当前功能判断。
+
+在线清单页面已接入统一导入、待补全列表、逐项/批量下载与本地载荷补全，移除旧入口跳转；常规 218 通过、4 专项默认跳过。后续继续真实下载/跨盘安装验收、来源编辑与重启恢复，不把命令绑定测试当作实机通过。
+
+在线清单增量：后端 `ImportPlan` 待下载声明及 `resource.materialize` 已实现；常规 209 通过、4 专项默认跳过。下一步接 App 统一列表与逐项下载/本地复用，再做真实闭环；现有旧入口暂保留，不能据此声称在线旧格式完成。
+
+最新：常规回归 **203 通过、4 专项默认跳过**。`DeploymentCapability` 已替换全局布尔门禁，IPC v4；实际 Desktop 产品版本读取已修复。C/E 跨盘测试副本和 Smoke 专用隔离 UI/Worker 宿主已准备，构建与只读范围检查通过，页面闭环尚未运行。生产资格仍待隔离 Desktop/App/Worker 完整实测后登记，不从 ZIP/旧任务获得。
+
+2026-09-12 追加苹果式简洁 UI 与安全收尾：三入口、石墨色深浅主题、详情折叠、单文件拖入和自动安装预览已接入；普通 JSON/文本/图片误判、版本冲突保留、跨类别模型哈希、失效实例隔离、默认共享目录、IPC 请求超时、安装锁可取消等待、文件暂存恢复和 Python 需要修复标记已增加回归。
+
+已追加：运行时节点绑定（含 Windows venv 监听子进程）、单文件节点 ZIP 往返、目录型模型成员完整性、跨 Worker 更新租约及独立更新引导、导出独立窗口和任务可执行操作规则。来源隔离 Desktop 已由 GUI 启动/运行实际模型和测试节点，并通过 FlowPack 发现及运行时分析核验。仍未完成：接管目标及 App/Worker 导出/下载/安装页面闭环；复杂动态节点/目录模型真实运行矩阵；多 App 实际升级；在线旧清单统一安装；任务侧面板。不得把界面精简或单测通过当成完整核心验收。
+
+本轮以用户新确认的八项核心需求为准：自动发现新版多实例 → 实际资源索引 → 多选/单类 ZIP 导出 → 第三方 ZIP 识别 → 缺失依赖补全 → 安装 → 更新与主题。首次使用自动建立应用索引，不再要求先手动选择资源库。
+
+执行顺序及当前落点：
+
+1. 已新增 `InstanceDescriptor`、登记/接管/参数/YAML 解析和资源扫描，首页、导出及安装共用实例选择；默认路径和动态信息矩阵尚未验收齐全。
+2. 已新增统一依赖分析、模型类别/相对引用/可选哈希、节点身份/版本、明确输入素材匹配；动态未知项不假定满足。
+3. 已接 `ImportPlan`、`ExportPlan`、普通 ZIP/ZIP64 和源文件变化检查；旧 `.cpack` 读取继续保留，在线清单保留旧下载/记录入口，尚未完全合并为新部署流程。
+4. 已接协议 v3 持久 Worker、schema v7、幂等、任务控制、文件/实例/解释器锁、重连与 journal 核对；异常矩阵尚需补充。
+5. 已接固定提交/Registry 版本来源、可选来源哈希与计算哈希分离、兼容 wheel 解析与禁止替换既有版本。未知来源、特殊脚本、源码安装明确阻断。
+6. 已接 24 小时自动更新检查、下载校验和安全退出协调，以及浅/深/系统主题；升级生命周期与系统事件实机验收未完成。
+
+生产安装门禁继续关闭，两个复制官方核心的真实运行成功不作为 Desktop GUI 适配器资格。测试结果和待验收项见 [核心实施记录](docs/CORE_IMPLEMENTATION_0.0.4.md)及 [验收表](REQUIREMENTS_ACCEPTANCE.md)。
+
+本轮交付本地候选安装器；不自动提交、推送、打标签或发布。旧规划的资源迁移、批量清理、包维护扩展保留后续，不因后续范围缩减而删除原始要求。下文 M0–M10 作为长期规划保存；与本节冲突时以本节及最新交接为准。
 
 项目官方GitHub仓库：[LightyearXizIl/ComfyUI-FlowPack](https://github.com/LightyearXizIl/ComfyUI-FlowPack)。该地址由用户指定；后续源码协作、GitHub Actions及发布产物以此仓库为目标，不另建同名仓库。
 

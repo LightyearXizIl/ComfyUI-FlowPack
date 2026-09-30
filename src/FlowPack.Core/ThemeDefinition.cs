@@ -21,8 +21,8 @@ public static class ThemeDefaults
 {
     public static ThemeDefinition Create(ThemeBase themeBase = ThemeBase.System) =>
         themeBase == ThemeBase.Dark
-            ? new ThemeDefinition("1", "深色", themeBase, "#5A9BFF", "#19253A", "#F1F6FF", 14, 12, ThemeDensity.Comfortable, true)
-            : new ThemeDefinition("1", themeBase == ThemeBase.Light ? "浅色" : "跟随系统", themeBase, "#1E63D6", "#F9F7F2", "#12233D", 14, 12, ThemeDensity.Comfortable, true);
+            ? new ThemeDefinition("1", "深色", themeBase, "#F5F5F7", "#161618", "#F5F5F7", 14, 12, ThemeDensity.Comfortable, true)
+            : new ThemeDefinition("1", themeBase == ThemeBase.Light ? "浅色" : "跟随系统", themeBase, "#1D1D1F", "#F5F5F7", "#1D1D1F", 14, 12, ThemeDensity.Comfortable, true);
 }
 
 public sealed record ThemeValidationResult(bool IsValid, IReadOnlyList<string> Errors)

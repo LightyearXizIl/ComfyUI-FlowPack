@@ -90,10 +90,11 @@ if (-not (Test-Path -LiteralPath $installerPath)) {
 }
 
 $checksumLines = @(
-    "{0} *{1}" -f (Get-FileHash -Algorithm SHA256 $installerPath).Hash, (Split-Path -Leaf $installerPath),
-    "{0} *{1}" -f (Get-FileHash -Algorithm SHA256 $appExe).Hash, (Split-Path -Leaf $appExe),
-    "{0} *worker/{1}" -f (Get-FileHash -Algorithm SHA256 $workerExe).Hash, (Split-Path -Leaf $workerExe)
+    ("{0} *{1}" -f (Get-FileHash -Algorithm SHA256 $installerPath).Hash, (Split-Path -Leaf $installerPath))
+    ("{0} *{1}" -f (Get-FileHash -Algorithm SHA256 $appExe).Hash, (Split-Path -Leaf $appExe))
+    ("{0} *worker/{1}" -f (Get-FileHash -Algorithm SHA256 $workerExe).Hash, (Split-Path -Leaf $workerExe))
 )
+if ($checksumLines.Count -ne 3) { throw 'Expected installer, App, and Worker checksums.' }
 [IO.File]::WriteAllLines((Join-Path $installerRoot 'SHA256SUMS.txt'), $checksumLines, [Text.UTF8Encoding]::new($false))
 
 Write-Output "Installer=$installerPath"

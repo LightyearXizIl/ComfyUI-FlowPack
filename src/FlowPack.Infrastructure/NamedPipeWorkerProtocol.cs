@@ -12,7 +12,7 @@ namespace FlowPack.Infrastructure;
 /// </summary>
 public sealed class NamedPipeWorkerServer
 {
-    private const int MaximumMessageCharacters = 1_048_576;
+    private const int MaximumMessageCharacters = WorkerIpcFrame.MaximumCharacters;
     private static readonly JsonSerializerOptions SerializerOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
     private readonly byte[] _sessionSecret;
 
@@ -41,7 +41,11 @@ public sealed class NamedPipeWorkerServer
         using var reader = new StreamReader(server, Encoding.UTF8, leaveOpen: true);
         await using var writer = new StreamWriter(server, new UTF8Encoding(false), leaveOpen: true) { AutoFlush = true };
 
-        var message = await reader.ReadLineAsync(cancellationToken);
+        using var receiveTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        receiveTimeout.CancelAfter(TimeSpan.FromSeconds(30));
+        string? message;
+        try { message = await WorkerIpcFrame.ReadAsync(reader, receiveTimeout.Token); }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested) { return; }
         var response = await ProcessMessageAsync(message, handler, cancellationToken);
         await writer.WriteLineAsync(JsonSerializer.Serialize(response, SerializerOptions));
     }
@@ -107,7 +111,7 @@ public sealed class NamedPipeWorkerServer
 
 public sealed class NamedPipeWorkerClient
 {
-    private const int MaximumMessageCharacters = 1_048_576;
+    private const int MaximumMessageCharacters = WorkerIpcFrame.MaximumCharacters;
     private static readonly JsonSerializerOptions SerializerOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     public async Task<WorkerResponse> SendAsync(
@@ -124,16 +128,18 @@ public sealed class NamedPipeWorkerClient
         await client.ConnectAsync(timeout.Token);
         using var reader = new StreamReader(client, Encoding.UTF8, leaveOpen: true);
         await using var writer = new StreamWriter(client, new UTF8Encoding(false), leaveOpen: true) { AutoFlush = true };
-        await writer.WriteLineAsync(JsonSerializer.Serialize(request, SerializerOptions));
-        var message = await reader.ReadLineAsync(cancellationToken);
+        await writer.WriteLineAsync(JsonSerializer.Serialize(request, SerializerOptions).AsMemory(), timeout.Token);
+        var message = await WorkerIpcFrame.ReadAsync(reader, timeout.Token);
         if (string.IsNullOrWhiteSpace(message) || message.Length > MaximumMessageCharacters)
         {
             throw new InvalidDataException("Worker 返回了空响应或超过大小限制的响应。");
         }
         try
         {
-            return JsonSerializer.Deserialize<WorkerResponse>(message, SerializerOptions)
+            var response = JsonSerializer.Deserialize<WorkerResponse>(message, SerializerOptions)
                 ?? throw new InvalidDataException("Worker 返回了无效响应。");
+            if (response.RequestId != request.RequestId) throw new InvalidDataException("Worker 响应与当前请求不匹配。");
+            return response;
         }
         catch (JsonException exception)
         {

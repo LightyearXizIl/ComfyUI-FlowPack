@@ -15,22 +15,42 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v7
 
+      - name: Read release mode
+        id: release-mode
+        shell: powershell
+        run: |
+          $manifestPath = "release-notes\$($env:GITHUB_REF_NAME).archive.json"
+          $isArchive = Test-Path -LiteralPath $manifestPath
+          if ($isArchive) {
+            $manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+            if ($manifest.kind -ne 'binary-archive' -or $manifest.version -ne $env:GITHUB_REF_NAME.TrimStart('v') -or
+                $manifest.installerSha256 -notmatch '^[A-Fa-f0-9]{64}$' -or $manifest.installerBytes -le 0) {
+              throw 'Invalid original-binary archive manifest.'
+            }
+            Write-Output 'Original local binary archive: do not rebuild or replace the preserved installer. Full original build source is unavailable; see release notes.'
+          }
+          "archive=$($isArchive.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
       - name: Install .NET SDK
+        if: steps.release-mode.outputs.archive != 'true'
         uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
       - name: Install Inno Setup
+        if: steps.release-mode.outputs.archive != 'true'
         shell: powershell
         run: choco install innosetup --yes --no-progress
 
       - name: Build, test, and package
+        if: steps.release-mode.outputs.archive != 'true'
         shell: powershell
         run: |
           $version = $env:GITHUB_REF_NAME.TrimStart('v')
           .\build\Build-Release.ps1 -Version $version
 
       - name: Upload workflow artifact
+        if: steps.release-mode.outputs.archive != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: ComfyUI-FlowPack-${{ github.ref_name }}-Windows
@@ -40,6 +60,7 @@ jobs:
           if-no-files-found: error
 
       - name: Create GitHub Release
+        if: steps.release-mode.outputs.archive != 'true'
         shell: powershell
         env:
           GH_TOKEN: ${{ github.token }}

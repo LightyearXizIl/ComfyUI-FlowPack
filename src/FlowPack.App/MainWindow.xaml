@@ -11,7 +11,8 @@
         MinHeight="640"
         Icon="Assets/FlowPack.ico"
         WindowStartupLocation="CenterScreen"
-        Background="{DynamicResource WindowBrush}">
+        Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextBrush}"
+        FontFamily="Segoe UI" AllowDrop="True" PreviewDragOver="OnFileDragOver" Drop="OnFileDrop">
   <Window.Resources>
     <DataTemplate x:Key="HomePageTemplate"><views:HomeView /></DataTemplate>
     <DataTemplate x:Key="LibraryPageTemplate"><views:LibraryView /></DataTemplate>
@@ -21,8 +22,8 @@
     <DataTemplate x:Key="SettingsPageTemplate"><views:SettingsView /></DataTemplate>
 
     <Style x:Key="NavButtonBase" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
-      <Setter Property="MinHeight" Value="80" />
-      <Setter Property="Padding" Value="14,24,14,18" />
+      <Setter Property="MinHeight" Value="64" />
+      <Setter Property="Padding" Value="14,18,14,14" />
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
       <Setter Property="BorderBrush" Value="Transparent" />
@@ -101,7 +102,7 @@
 
   <Grid x:Name="RootLayout">
     <Grid.RowDefinitions>
-      <RowDefinition Height="80" />
+      <RowDefinition Height="64" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
@@ -109,7 +110,7 @@
             Background="{DynamicResource WindowBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="0,0,0,1">
-      <Grid Margin="52,0">
+      <Grid Margin="24,0">
         <StackPanel x:Name="BrandArea"
                     HorizontalAlignment="Left"
                     VerticalAlignment="Center"
@@ -143,36 +144,30 @@
                   Style="{StaticResource LibraryNavButton}"
                   Command="{Binding NavigateCommand}"
                   CommandParameter="Library" />
-          <Button Content="{Binding Text[Nav.Packaging]}"
-                  Style="{StaticResource PackagingNavButton}"
-                  Command="{Binding NavigateCommand}"
-                  CommandParameter="Packaging" />
           <Button Content="{Binding Text[Nav.Install]}"
                   Style="{StaticResource InstallNavButton}"
                   Command="{Binding NavigateCommand}"
                   CommandParameter="Install" />
-          <Button Content="{Binding Text[Nav.Tasks]}"
-                  Style="{StaticResource TasksNavButton}"
-                  Command="{Binding NavigateCommand}"
-                  CommandParameter="Tasks" />
         </StackPanel>
 
         <StackPanel x:Name="StatusArea"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Center"
                     Orientation="Horizontal"
-                    MaxWidth="260">
-          <Border Style="{StaticResource StatusBadge}"
-                  Margin="0,0,12,0"
-                  MaxWidth="196"
-                  ToolTip="{Binding StatusNotice}">
-            <TextBlock Text="{Binding StatusNotice}"
-                       Foreground="{DynamicResource WarningBrush}"
-                       FontSize="12"
-                       FontWeight="SemiBold"
-                       TextTrimming="CharacterEllipsis" />
-          </Border>
-          <Button Content="⚙"
+                    MaxWidth="300">
+          <Grid Width="156" Margin="0,0,8,0">
+          <ComboBox ItemsSource="{Binding DesktopInstances}"
+                    SelectedItem="{Binding SelectedInstance}" DisplayMemberPath="DisplayName"
+                    IsEnabled="{Binding CoreReady}" ToolTip="{Binding InstancePaths}"
+                    automation:AutomationProperties.Name="选择 Desktop 实例" />
+          <TextBlock Text="选择实例" Margin="10,0,30,0" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" IsHitTestVisible="False">
+            <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding SelectedInstance}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+          </TextBlock>
+          </Grid>
+          <Button x:Name="TasksButton" Content="&#xE823;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Style="{StaticResource IconButton}"
+                  ToolTip="{Binding Text[Nav.Tasks]}" automation:AutomationProperties.Name="{Binding Text[Nav.Tasks]}"
+                  Click="OnTasksToggle" />
+          <Button Content="&#xE713;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                   Style="{StaticResource IconButton}"
                   ToolTip="{Binding Text[Nav.Settings]}"
                   FontSize="18"
@@ -183,12 +178,9 @@
       </Grid>
     </Border>
 
-    <ScrollViewer Grid.Row="1"
-                  VerticalScrollBarVisibility="Auto"
-                  HorizontalScrollBarVisibility="Disabled"
-                  Focusable="False">
-      <ContentControl x:Name="PageHost"
-                      Margin="52,42,52,52"
+      <ContentControl x:Name="PageHost" Grid.Row="1"
+                      Margin="32,28,32,24"
+                      HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                       Content="{Binding}"
                       automation:AutomationProperties.AutomationId="PageHost">
         <ContentControl.Style>
@@ -204,6 +196,16 @@
           </Style>
         </ContentControl.Style>
       </ContentControl>
-    </ScrollViewer>
+    <Border x:Name="TaskPanel" Grid.Row="1" Width="440" HorizontalAlignment="Right" Visibility="Collapsed"
+            Background="{DynamicResource WindowBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0"
+            Padding="24" Panel.ZIndex="5" PreviewKeyDown="OnTaskPanelKeyDown"
+            KeyboardNavigation.TabNavigation="Cycle" AutomationProperties.AutomationId="TaskPanel">
+      <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+        <Button x:Name="CloseTasksButton" Content="关闭任务面板" HorizontalAlignment="Right" Margin="0,0,0,12"
+                Style="{StaticResource SecondaryButton}" Click="OnTasksClose"/>
+        <views:TasksView Grid.Row="1"/>
+      </Grid>
+    </Border>
   </Grid>
 </Window>

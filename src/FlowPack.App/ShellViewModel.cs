@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Data;
 using System.Windows.Input;
 using FlowPack.ComfyUI;
@@ -48,14 +49,15 @@ public sealed record ResourceLibraryRow(
 public sealed record InstallPreviewActionRow(string Summary, string Kind, string RequiredSize, bool IsBlocking);
 public sealed record SettingOption<T>(T Value, string Label);
 
-public sealed class ShellViewModel : INotifyPropertyChanged
+public sealed partial class ShellViewModel : INotifyPropertyChanged
 {
     private FlowPage _currentPage = FlowPage.Home;
     private PackageRow? _selectedPackage;
     private readonly ThemePreferenceStore _themeStore;
     private readonly LibraryBindingStore _libraryBindingStore;
     private readonly IInstanceInspector _instanceInspector;
-    private ResourceLibraryDatabase? _libraryDatabase;
+    private WorkerLibraryClient? _libraryDatabase;
+    private readonly Func<string, WorkerLibraryClient> _libraryClientFactory;
     private InstanceFingerprint? _candidateInstance;
     private readonly IComfyDesktopDetector? _desktopDetector;
     private readonly ILocalizationService _localization;
@@ -87,9 +89,11 @@ public sealed class ShellViewModel : INotifyPropertyChanged
         IInstanceInspector? instanceInspector = null,
         IComfyDesktopDetector? desktopDetector = null,
         ILocalizationService? localization = null,
-        IUpdateService? updateService = null)
+        IUpdateService? updateService = null,
+        Func<string, WorkerLibraryClient>? libraryClientFactory = null)
     {
         _themeStore = themeStore ?? new ThemePreferenceStore();
+        _libraryClientFactory = libraryClientFactory ?? (path => new WorkerLibraryClient(path));
         _libraryBindingStore = libraryBindingStore ?? new LibraryBindingStore();
         _instanceInspector = instanceInspector ?? new ComfyUiInspector();
         _desktopDetector = desktopDetector;
@@ -115,6 +119,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged
             }
 
             // Legacy links inside existing views resolve into the new six-area shell.
+            if (route is "Workflows" or "Models" or "Nodes")
+                LibraryTabIndex = route == "Models" ? 1 : route == "Nodes" ? 2 : 0;
             CurrentPage = route switch
             {
                 "Packages" or "InstallPreview" => FlowPage.Install,
@@ -160,6 +166,8 @@ public sealed class ShellViewModel : INotifyPropertyChanged
             }
         });
         CheckForUpdatesCommand = new RelayCommand(_ => _ = CheckForUpdatesAsync());
+        InstallUpdateCommand = new RelayCommand(_ => _ = InstallUpdateAsync(), _ => HasUpdate);
+        InitializeCoreCommands();
 
         PackageView = CollectionViewSource.GetDefaultView(Packages);
         WorkflowView = CollectionViewSource.GetDefaultView(Workflows);
@@ -329,9 +337,12 @@ public sealed class ShellViewModel : INotifyPropertyChanged
         {
             var current = typeof(ShellViewModel).Assembly.GetName().Version ?? new Version(0, 0, 0);
             var update = await _updateService.CheckAsync(new Version(current.Major, current.Minor, Math.Max(0, current.Build)), CancellationToken.None);
+            _availableUpdate = update;
+            OnPropertyChanged(nameof(HasUpdate));
+            CommandManager.InvalidateRequerySuggested();
             UpdateNotice = update is null
                 ? Text["Update.Latest"]
-                : $"{Text["Update.Available"]} v{update.Version}（SHA-256 已验证后才能下载）。";
+                : $"{Text["Update.Available"]} v{update.Version}，点击更新后下载并校验安装器。";
         }
         catch (HttpRequestException)
         {
@@ -344,6 +355,11 @@ public sealed class ShellViewModel : INotifyPropertyChanged
         catch (JsonException)
         {
             UpdateNotice = Text["Update.Failed"];
+        }
+        catch (InvalidDataException ex)
+        {
+            _availableUpdate = null; OnPropertyChanged(nameof(HasUpdate));
+            UpdateNotice = "更新校验失败：" + ex.Message;
         }
     }
 
@@ -409,7 +425,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged
     }
 
     public bool IsHomeContext => CurrentPage == FlowPage.Home;
-    public bool IsLibraryContext => CurrentPage == FlowPage.Library;
+    public bool IsLibraryContext => CurrentPage is FlowPage.Library or FlowPage.Packaging;
     public bool IsPackagingContext => CurrentPage == FlowPage.Packaging;
     public bool IsInstallContext => CurrentPage == FlowPage.Install;
     public bool IsTasksContext => CurrentPage == FlowPage.Tasks;
@@ -443,8 +459,15 @@ public sealed class ShellViewModel : INotifyPropertyChanged
         {
             if (_draftTheme.Base == value) return;
             var defaults = ThemeDefaults.Create(value == ThemeBase.System ? GetSystemThemeBase() : value);
-            UpdateDraft(_draftTheme with { Base = value, SurfaceColor = defaults.SurfaceColor, TextColor = defaults.TextColor });
+            var accent = _draftTheme.AccentColor is "#1D1D1F" or "#F5F5F7" or "#1E63D6" or "#5A9BFF"
+                ? defaults.AccentColor : _draftTheme.AccentColor;
+            UpdateDraft(_draftTheme with { Base = value, AccentColor = accent, SurfaceColor = defaults.SurfaceColor, TextColor = defaults.TextColor });
         }
+    }
+    public ThemeBase SelectedThemeBase
+    {
+        get => DraftThemeBase;
+        set { DraftThemeBase = value; _ = ApplyThemeAsync(); OnPropertyChanged(); }
     }
 
     public string AccentColor
@@ -640,9 +663,9 @@ public sealed class ShellViewModel : INotifyPropertyChanged
     {
         try
         {
-            var binding = _libraryBindingStore.LoadAsync().GetAwaiter().GetResult();
+            var binding = _libraryBindingStore.Load();
             if (binding is null || !Directory.Exists(binding.LibraryPath)) return;
-            _libraryDatabase = new ResourceLibraryDatabase(binding.LibraryPath);
+            _libraryDatabase = _libraryClientFactory(binding.LibraryPath);
             OnPropertyChanged(nameof(HasDownloadablePackage));
             ResourceLibraryLocation = _libraryDatabase.LibraryPath;
             StatusNotice = "●  已关联资源库，尚未检查环境";
@@ -710,7 +733,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged
 
         try
         {
-            var database = new ResourceLibraryDatabase(dialog.FolderName);
+            var database = _libraryClientFactory(dialog.FolderName);
             await database.InitializeAsync();
             await _libraryBindingStore.SaveAsync(new LibraryBinding(database.LibraryPath, DateTimeOffset.UtcNow));
             if (_libraryDatabase is not null) await _libraryDatabase.DisposeAsync();
@@ -806,81 +829,23 @@ public sealed class ShellViewModel : INotifyPropertyChanged
 
     private async Task DownloadPackageAsync()
     {
-        if (_libraryDatabase is null || SelectedPackage is null)
-        {
-            MessageBox.Show("请先关联资源库并选择资源包。", "无法下载", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-        var resources = SelectedPackage.Resources.ToArray();
-        if (resources.Length == 0 || resources.Any(resource => string.IsNullOrWhiteSpace(resource.SourceUrl) || string.IsNullOrWhiteSpace(resource.Sha256)))
-        {
-            MessageBox.Show("资源包中存在缺少 HTTPS 来源或 SHA-256 的资源，不能安全下载。", "无法下载", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
-        var worker = StartWorker(_libraryDatabase.LibraryPath, out var pipeName, out var secret);
-        if (worker is null)
-        {
-            MessageBox.Show("找不到 Worker 可执行文件。请使用完整安装包，或先生成 Release Worker 输出。", "无法下载", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return;
-        }
+        if (SelectedPackage is null) { CoreNotice = "请先选择资源包。"; return; }
         IsDownloadingPackage = true;
         try
         {
-            var client = new NamedPipeWorkerClient();
-            var ready = false;
-            for (var attempt = 0; attempt < 20 && !ready; attempt++)
+            await EnsureCoreLibraryAsync();
+            foreach (var resource in SelectedPackage.Resources)
             {
-                try
-                {
-                    var ping = await client.SendAsync(pipeName, new WorkerRequest(WorkerProtocol.Version, Guid.NewGuid().ToString("N"), secret, WorkerProtocol.PingCommand), TimeSpan.FromMilliseconds(500));
-                    ready = ping.Succeeded;
-                }
-                catch (OperationCanceledException) { await Task.Delay(50); }
+                if (string.IsNullOrWhiteSpace(resource.SourceUrl) || string.IsNullOrWhiteSpace(resource.Sha256))
+                    throw new InvalidDataException("旧清单资源缺少下载来源或 SHA-256：" + resource.Name);
+                await _libraryDatabase!.RunAsync<DownloadResult>("task.download",
+                    new DownloadTaskPayload(resource.SourceUrl, resource.Sha256, Path.GetFileName(resource.PackagePath ?? resource.Name)), JobProgress());
             }
-            if (!ready) throw new IOException("Worker 未在限定时间内就绪。");
-            foreach (var resource in resources)
-            {
-                var response = await client.SendAsync(pipeName, new WorkerRequest(
-                    WorkerProtocol.Version, Guid.NewGuid().ToString("N"), secret, WorkerProtocol.DownloadCommand,
-                    System.Text.Json.JsonSerializer.SerializeToElement(new DownloadTaskPayload(resource.SourceUrl!, resource.Sha256!, resource.Name))), TimeSpan.FromSeconds(10));
-                if (!response.Succeeded) throw new IOException(response.Error?.Message ?? "Worker 拒绝下载请求。");
-            }
-            await RestoreTasksAsync();
+            await RefreshCoreTasksAsync();
             CurrentPage = FlowPage.Tasks;
         }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or HttpRequestException or OperationCanceledException)
-        {
-            MessageBox.Show(exception.Message, "下载失败", MessageBoxButton.OK, MessageBoxImage.Warning);
-            await RestoreTasksAsync();
-        }
-        finally
-        {
-            if (!worker.HasExited) worker.Kill(entireProcessTree: true);
-            await worker.WaitForExitAsync();
-            IsDownloadingPackage = false;
-        }
-    }
-
-    private static Process? StartWorker(string libraryPath, out string pipeName, out string secret)
-    {
-        pipeName = $"flowpack-{Guid.NewGuid():N}";
-        secret = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
-        try
-        {
-            var installedWorker = Path.Combine(AppContext.BaseDirectory, "worker", "ComfyUI.FlowPack.Worker.exe");
-            if (File.Exists(installedWorker))
-            {
-                return Process.Start(new ProcessStartInfo(installedWorker, $"--pipe {pipeName} --secret {secret} --library \"{libraryPath}\"") { UseShellExecute = false, CreateNoWindow = true });
-            }
-            var developmentWorker = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "FlowPack.Worker", "bin", "Release", "net10.0-windows", "ComfyUI.FlowPack.Worker.dll"));
-            return File.Exists(developmentWorker)
-                ? Process.Start(new ProcessStartInfo("dotnet", $"\"{developmentWorker}\" --pipe {pipeName} --secret {secret} --library \"{libraryPath}\"") { UseShellExecute = false, CreateNoWindow = true })
-                : null;
-        }
-        catch (System.ComponentModel.Win32Exception)
-        {
-            return null;
-        }
+        catch (Exception ex) { CoreNotice = "下载失败：" + ex.Message; }
+        finally { IsDownloadingPackage = false; }
     }
 
     private async Task RestoreLatestDraftAsync()
@@ -1213,7 +1178,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged
     {
         try
         {
-            var saved = _themeStore.LoadAsync().GetAwaiter().GetResult();
+            var saved = _themeStore.Load();
             return saved ?? ThemeDefaults.Create(ThemeBase.System);
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or UnauthorizedAccessException)
@@ -1226,7 +1191,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged
     private void ToggleQuickTheme()
     {
         DraftThemeBase = _draftTheme.Base == ThemeBase.Dark ? ThemeBase.Light : ThemeBase.Dark;
-        PreviewTheme();
+        _ = ApplyThemeAsync();
     }
 
     private void PreviewTheme()
@@ -1410,6 +1375,7 @@ public sealed class ShellViewModel : INotifyPropertyChanged
     {
         OnPropertyChanged(nameof(ThemeName));
         OnPropertyChanged(nameof(DraftThemeBase));
+        OnPropertyChanged(nameof(SelectedThemeBase));
         OnPropertyChanged(nameof(AccentColor));
         OnPropertyChanged(nameof(SurfaceColor));
         OnPropertyChanged(nameof(TextColor));
@@ -1425,23 +1391,48 @@ public sealed class ShellViewModel : INotifyPropertyChanged
         var resolvedTheme = theme.Base == ThemeBase.System
             ? theme with { Base = GetSystemThemeBase() }
             : theme;
+        if (theme.Base == ThemeBase.System &&
+            ((theme.SurfaceColor == ThemeDefaults.Create(ThemeBase.Light).SurfaceColor && theme.TextColor == ThemeDefaults.Create(ThemeBase.Light).TextColor) ||
+             (theme.SurfaceColor == ThemeDefaults.Create(ThemeBase.Dark).SurfaceColor && theme.TextColor == ThemeDefaults.Create(ThemeBase.Dark).TextColor)))
+        {
+            var defaults = ThemeDefaults.Create(resolvedTheme.Base);
+            resolvedTheme = resolvedTheme with { SurfaceColor = defaults.SurfaceColor, TextColor = defaults.TextColor };
+        }
         var resources = Application.Current.Resources;
         var dark = resolvedTheme.Base == ThemeBase.Dark;
+        if (resolvedTheme.AccentColor is "#1E63D6" or "#5A9BFF" or "#1D1D1F" or "#F5F5F7")
+            resolvedTheme = resolvedTheme with { AccentColor = ThemeDefaults.Create(resolvedTheme.Base).AccentColor };
+        if (resolvedTheme.SurfaceColor is "#19253A" or "#F9F7F2" && resolvedTheme.TextColor is "#F1F6FF" or "#12233D")
+            resolvedTheme = resolvedTheme with { SurfaceColor = ThemeDefaults.Create(resolvedTheme.Base).SurfaceColor, TextColor = ThemeDefaults.Create(resolvedTheme.Base).TextColor };
         resources["Color.Window"] = ReadColor(resolvedTheme.SurfaceColor);
-        resources["Color.Surface"] = ReadColor(dark ? "#202E46" : "#FFFFFF");
+        resources["Color.Surface"] = ReadColor(dark ? "#222225" : "#FFFFFF");
         resources["Color.Text"] = ReadColor(resolvedTheme.TextColor);
-        resources["Color.Muted"] = ReadColor(dark ? "#B2C0D4" : "#65748A");
-        resources["Color.Border"] = ReadColor(dark ? "#32435C" : "#DCE4ED");
+        resources["Color.Muted"] = ReadColor(dark ? "#B1B1B8" : "#646469");
+        resources["Color.Border"] = ReadColor(dark ? "#3A3A3F" : "#DFDFE3");
         resources["Color.Accent"] = ReadColor(resolvedTheme.AccentColor);
-        resources["Color.AccentSoft"] = ReadColor(dark ? "#213A62" : "#EAF1FF");
+        resources["Color.AccentSoft"] = ReadColor(dark ? "#38383C" : "#EBEBEF");
         resources["Color.SuccessSoft"] = ReadColor(dark ? "#173B34" : "#EAF8F1");
         resources["Color.WarningSoft"] = ReadColor(dark ? "#44351B" : "#FFF4DE");
+        resources["Color.Warning"] = ReadColor(dark ? "#F3BA62" : "#9A5F10");
+        resources["Color.Success"] = ReadColor(dark ? "#70D6A8" : "#14855A");
+        resources["Color.Error"] = ReadColor(dark ? "#FF9C94" : "#B42318");
+        resources["Color.Selection"] = resources["Color.AccentSoft"];
+        resources["Color.SelectionText"] = resources["Color.Text"];
+        foreach (var role in new[] { "Window", "Surface", "Text", "Muted", "Border", "Accent", "AccentSoft", "Success", "SuccessSoft", "Warning", "WarningSoft", "Error" })
+            resources[role + "Brush"] = new SolidColorBrush((Color)resources["Color." + role]);
+        var accent = (Color)resources["Color.Accent"];
+        static double Linear(byte value) { var channel = value / 255d; return channel <= .04045 ? channel / 12.92 : Math.Pow((channel + .055) / 1.055, 2.4); }
+        var luminance = .2126 * Linear(accent.R) + .7152 * Linear(accent.G) + .0722 * Linear(accent.B);
+        resources["PrimaryTextBrush"] = new SolidColorBrush(SystemParameters.HighContrast ? SystemColors.WindowColor : luminance > .179 ? Colors.Black : Colors.White);
         resources["BodyFontSize"] = (double)resolvedTheme.BodyFontSize;
         resources["SubtleTextFontSize"] = Math.Max(12d, resolvedTheme.BodyFontSize - 1);
         resources["SectionTitleFontSize"] = resolvedTheme.BodyFontSize + 3d;
         resources["PageTitleFontSize"] = resolvedTheme.BodyFontSize + 16d;
         resources["CardCornerRadius"] = new CornerRadius(resolvedTheme.CornerRadius);
         resources["ControlCornerRadius"] = new CornerRadius(Math.Min(8, resolvedTheme.CornerRadius));
+        resources["SelectionBrush"] = new SolidColorBrush((Color)resources["Color.Selection"]);
+        resources["SelectionTextBrush"] = new SolidColorBrush((Color)resources["Color.SelectionText"]);
+        if (SystemParameters.HighContrast) HighContrastPalette.Apply(resources, SystemColors.WindowColor, SystemColors.WindowTextColor);
     }
 
     private static ThemeBase GetSystemThemeBase()

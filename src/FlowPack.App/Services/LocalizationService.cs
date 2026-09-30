@@ -31,9 +31,9 @@ public sealed class LocalizationService : ILocalizationService
     private static readonly IReadOnlyDictionary<string, string> Chinese = new Dictionary<string, string>
     {
         ["Nav.Home"] = "首页",
-        ["Nav.Library"] = "资源库",
+        ["Nav.Library"] = "我的资源",
         ["Nav.Packaging"] = "打包",
-        ["Nav.Install"] = "安装",
+        ["Nav.Install"] = "导入安装",
         ["Nav.Tasks"] = "任务",
         ["Nav.Settings"] = "设置",
         ["Page.Home.Title"] = "让 ComfyUI 资源井然有序",

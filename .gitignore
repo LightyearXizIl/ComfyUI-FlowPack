@@ -5,6 +5,8 @@ artifacts/publish/
 artifacts/installer/
 artifacts/install-test/
 artifacts/acceptance/
+artifacts/archive/
+artifacts/candidate-history/
 TestResults/
 
 # IDE and user state
