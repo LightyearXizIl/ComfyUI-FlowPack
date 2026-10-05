@@ -618,6 +618,11 @@ public sealed class UiShellTests
 
     private static void VerifySecondaryMenus(MainWindow window, ShellViewModel vm, ContentControl pageHost, string? directory, ThemeBase theme, double width)
     {
+        // Complete the modal's queued focus restoration before simulating the next click.
+        // Otherwise a CI dispatcher can restore background focus after the menu opens,
+        // causing WPF to dismiss it as it would when another control receives focus.
+        window.Activate();
+        window.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
         var modelButton = Descendants(pageHost).OfType<Button>().Single(button => Equals(button.Content, "模型文件夹"));
         modelButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         var menu = Assert.IsType<ContextMenu>(modelButton.ContextMenu);

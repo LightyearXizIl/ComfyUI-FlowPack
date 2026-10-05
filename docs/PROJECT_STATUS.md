@@ -6,7 +6,7 @@
 
 本地正式安装器已生成，标准 Release **367 通过、0 失败、5 按需专项跳过**。正式 App/Worker 的真实页面导出、取消依赖保持、自动导入与本地复用预览通过，进程正常退出。本轮未重新运行 Desktop 推理；此前 Desktop 1.1.4 两布局安装及真实输出资格证据已提取到[资格记录](release-evidence/0.0.6/deployment-qualification.json)。新版本通过标签工作流发布，远端结果补录到同目录 `release.json`。
 
-本机 `artifacts/installer` 为正式安装器及校验文件。旧便携包、历史构建、隔离环境和旧本地安装包副本已清理，原便携/预览数据保留在 `artifacts/user-data`。工作区外临时测试目录的删除被自动审批拒绝，未删除。历史文档中的 `artifacts/acceptance` 与旧便携包路径只用于追溯，原产物现已清理；当前精简证据在[发布证据](release-evidence/0.0.6/README.md)。
+本机 `artifacts/installer` 为正式安装器及校验文件。旧便携包、历史构建、隔离环境和旧本地安装包副本已清理，原便携/预览数据保留在 `artifacts/user-data`。工作区外临时测试目录和本轮部分构建缓存的删除被自动审批拒绝，这部分仍有残留。历史文档中的 `artifacts/acceptance` 与旧便携包路径只用于追溯，原产物现已清理；当前精简证据在[发布证据](release-evidence/0.0.6/README.md)。
 
 ## 前轮界面 · R7 弹窗风格统一
 
