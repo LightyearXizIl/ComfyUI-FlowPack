@@ -10,7 +10,7 @@ public sealed record ExportPlan(string Id, IReadOnlyList<ExportFile> Files, IRea
 
 public sealed class PlannedZipExportService
 {
-    public async Task<ExportPlan> PlanAsync(IReadOnlyList<LocalResource> resources, IReadOnlyList<string>? dependencyIssues = null, CancellationToken token = default)
+    public async Task<ExportPlan> PlanAsync(IReadOnlyList<LocalResource> resources, IReadOnlyList<string>? dependencyIssues = null, CancellationToken token = default, IProgress<OperationProgress>? progress = null)
     {
         var entries = new Dictionary<string, ExportFile>(StringComparer.OrdinalIgnoreCase);
         var issues = new List<string>(dependencyIssues ?? []);
@@ -26,7 +26,7 @@ public sealed class PlannedZipExportService
                 {
                     var relative = "models/" + prefix + "/" + ResourceFiles.Relative(bundleRoot, file);
                     ValidateRelative(relative);
-                    var entry = new ExportFile(file, relative, new FileInfo(file).Length, await ResourceImportService.HashAsync(file, token));
+                    var entry = new ExportFile(file, relative, new FileInfo(file).Length, await ResourceImportService.HashAsync(file, token, progress));
                     if (entries.TryGetValue(relative, out var previous) && previous.Sha256 != entry.Sha256) issues.Add("同名异内容资源不能改名打包：" + relative);
                     else entries.TryAdd(relative, entry);
                 }
@@ -42,7 +42,7 @@ public sealed class PlannedZipExportService
                     resource.Kind == ResourceKind.Model ? "models/" + (file == resource.SourcePath ? resource.RelativePath :
                         ((Path.GetDirectoryName(resource.RelativePath)?.Replace('\\', '/') is { Length: > 0 } folder ? folder + "/" : "") + ResourceFiles.Relative(Path.GetDirectoryName(resource.SourcePath)!, file))) : resource.RelativePath;
                 ValidateRelative(relative);
-                var entry = new ExportFile(file, relative, new FileInfo(file).Length, await ResourceImportService.HashAsync(file, token));
+                var entry = new ExportFile(file, relative, new FileInfo(file).Length, await ResourceImportService.HashAsync(file, token, progress));
                 if (entries.TryGetValue(relative, out var existing))
                 {
                     if (existing.Sha256 != entry.Sha256) issues.Add("同名异内容资源不能改名打包：" + relative);
@@ -53,7 +53,7 @@ public sealed class PlannedZipExportService
         return new(Guid.NewGuid().ToString("N"), entries.Values.ToArray(), issues.Distinct().ToArray(), entries.Values.Sum(x => x.SizeBytes));
     }
 
-    public async Task ExportAsync(ExportPlan plan, string output, bool allowPartial = false, CancellationToken token = default)
+    public async Task ExportAsync(ExportPlan plan, string output, bool allowPartial = false, CancellationToken token = default, IProgress<OperationProgress>? progress = null)
     {
         if (plan.Files.Count == 0) throw new InvalidDataException("没有选择可以导出的文件。");
         if (plan.Issues.Any(x => x.StartsWith("同名异内容")) || (!allowPartial && plan.Issues.Count > 0))
@@ -68,6 +68,8 @@ public sealed class PlannedZipExportService
             await using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 131072, true))
             {
                 ownsTemporary = true;
+                long completed = 0;
+                progress?.Report(new("写入资源包", 0, plan.TotalBytes, "字节"));
                 using var zip = new ZipArchive(stream, ZipArchiveMode.Create);
                 foreach (var file in plan.Files)
                 {
@@ -80,9 +82,10 @@ public sealed class PlannedZipExportService
                     using var hash = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
                     var buffer = new byte[131072]; int read;
                     while ((read = await source.ReadAsync(buffer, token)) > 0)
-                    { hash.AppendData(buffer, 0, read); await destination.WriteAsync(buffer.AsMemory(0, read), token); }
+                    { hash.AppendData(buffer, 0, read); await destination.WriteAsync(buffer.AsMemory(0, read), token); completed += read; progress?.Report(new("写入资源包", completed, plan.TotalBytes, "字节")); }
                     if (Convert.ToHexString(hash.GetHashAndReset()) != file.Sha256) throw new IOException("导出过程中源文件已改变：" + file.ArchivePath);
                 }
+                progress?.Report(new("写入资源清单并完成校验"));
                 var manifest = zip.CreateEntry("flowpack-manifest.json");
                 await using var metadata = manifest.Open();
                 await JsonSerializer.SerializeAsync(metadata, new { formatVersion = "1", complete = plan.Issues.Count == 0,

@@ -14,10 +14,24 @@ public sealed partial class ShellViewModel
 {
     private UpdateInfo? _availableUpdate;
     private bool _updating;
+    private bool _checkingForUpdate;
     private bool _themeSubscribed;
     private string? _updateHelperRoot;
     private bool _updateHandoffConfirmed;
-    public bool HasUpdate => _availableUpdate is not null && !_updating;
+    public bool HasUpdate => _availableUpdate is not null && !_updating && !_checkingForUpdate;
+    public ICommand UpdateActionCommand => HasUpdate ? InstallUpdateCommand : CheckForUpdatesCommand;
+    public string UpdateActionLabel => _updating ? Text["Update.Updating"]
+        : _checkingForUpdate ? Text["Update.Checking"]
+        : HasUpdate ? Text["Update.Download"] : Text["Update.Check"];
+    public string UpdateActionHint => HasUpdate ? Text["Update.InstallHint"] : string.Empty;
+    private void RefreshUpdateAction()
+    {
+        OnPropertyChanged(nameof(HasUpdate));
+        OnPropertyChanged(nameof(UpdateActionCommand));
+        OnPropertyChanged(nameof(UpdateActionLabel));
+        OnPropertyChanged(nameof(UpdateActionHint));
+        CommandManager.InvalidateRequerySuggested();
+    }
     public ICommand InstallUpdateCommand { get; private set; } = null!;
     private async Task CheckForUpdatesAutomaticallyAsync()
     {
@@ -36,14 +50,14 @@ public sealed partial class ShellViewModel
     private async Task InstallUpdateAsync()
     {
         if (_availableUpdate is null || _updating) return;
-        _updating = true; OnPropertyChanged(nameof(HasUpdate));
+        _updating = true; BeginOperationProgress(); RefreshUpdateAction();
         OnPropertyChanged(nameof(CoreReady)); CommandManager.InvalidateRequerySuggested();
         try
         {
             await EnsureCoreLibraryAsync();
             var update = _availableUpdate;
             UpdateNotice = "正在下载并校验更新安装器…";
-            var downloaded = await _libraryDatabase!.RunAsync<DownloadResult>("task.download", new DownloadTaskPayload(update.InstallerUri.ToString(), update.Sha256, update.InstallerFileName));
+            var downloaded = await _libraryDatabase!.RunAsync<DownloadResult>("task.download", new DownloadTaskPayload(update.InstallerUri.ToString(), update.Sha256, update.InstallerFileName), JobProgress());
             var helper = await UpdateBootstrapLauncher.StartAsync(Path.Combine(AppContext.BaseDirectory, "worker", "ComfyUI.FlowPack.Worker.exe"), downloaded.StagingPath, update.Sha256);
             _updateHelperRoot = helper.Root; _updateHandoffConfirmed = false;
             using var helperProcess = helper.Process;
@@ -68,13 +82,13 @@ public sealed partial class ShellViewModel
                 await Task.Delay(250);
             }
         }
-        catch (Exception ex) { UpdateNotice = "更新失败：" + ex.Message; }
+        catch (Exception ex) { FailOperationProgress(ex.Message); UpdateNotice = "更新失败：" + ex.Message; }
         finally
         {
             if (!_updateHandoffConfirmed && _updateHelperRoot is not null)
                 try { await File.WriteAllTextAsync(Path.Combine(_updateHelperRoot, "cancel.txt"), "cancel"); } catch (IOException) { }
             _updateHelperRoot = null;
-            _updating = false; OnPropertyChanged(nameof(HasUpdate)); OnPropertyChanged(nameof(CoreReady)); CommandManager.InvalidateRequerySuggested();
+            EndOperationProgress(); _updating = false; RefreshUpdateAction(); OnPropertyChanged(nameof(CoreReady));
         }
     }
     private void OnSystemThemeChanged(object sender, UserPreferenceChangedEventArgs e)

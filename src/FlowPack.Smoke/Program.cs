@@ -14,6 +14,12 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        if (args is ["--acceptance-transfer", var transferScope, var transferRunId])
+            return TransferAcceptanceHost.Run(transferScope, transferRunId);
+        if (args is ["--acceptance-transfer", var productionScope, var productionRunId, "--production-worker", var workerExecutable])
+            return TransferAcceptanceHost.Run(productionScope, productionRunId, workerExecutable);
+        if (args is ["--acceptance-transfer", var scopedProduction, var scopedRun, "--production-worker", var scopedWorker, "--target", var targetId])
+            return TransferAcceptanceHost.Run(scopedProduction, scopedRun, scopedWorker, targetId);
         if (args is ["--acceptance-update-coordination"])
             return UpdateCoordinationAcceptance.RunAsync().GetAwaiter().GetResult();
         if (args is ["--acceptance-update-child", var updateRoot, var updateRole])

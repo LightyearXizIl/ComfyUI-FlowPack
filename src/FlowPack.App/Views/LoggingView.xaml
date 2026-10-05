@@ -1,0 +1,37 @@
+<UserControl x:Class="FlowPack.App.Views.LoggingView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <ScrollViewer Style="{StaticResource PageScroll}" Foreground="{DynamicResource TextBrush}">
+    <StackPanel AutomationProperties.AutomationId="Settings.Logging">
+      <TextBlock Text="日志" Style="{StaticResource SectionTitle}" FontSize="22" Margin="0,0,0,8"/>
+      <TextBlock Text="记录软件运行情况，方便排查问题。设置修改后立即生效。" Style="{StaticResource SubtleText}" Margin="0,0,0,28"/>
+      <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="240"/></Grid.ColumnDefinitions>
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="24"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <TextBlock Text="记录强度" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        <ComboBox Grid.Column="1" ItemsSource="{Binding LogIntensityOptions}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                  SelectedValue="{Binding SelectedLogIntensity,Mode=TwoWay}" AutomationProperties.AutomationId="Logs.Intensity" AutomationProperties.Name="日志记录强度"/>
+        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding LogIntensityDescription}" Style="{StaticResource SubtleText}" Margin="0,10,0,0"/>
+        <TextBlock Grid.Row="3" Text="保留时间" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding LogRetentionOptions}" SelectedItem="{Binding SelectedLogRetentionDays,Mode=TwoWay}"
+                  AutomationProperties.AutomationId="Logs.Retention" AutomationProperties.Name="日志保留天数">
+          <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding StringFormat={}{0} 天}"/></DataTemplate></ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBlock Grid.Row="4" Grid.ColumnSpan="2" Text="保留最近所选天数的日志；启动时和运行期间每小时清理超期文件。" Style="{StaticResource SubtleText}" Margin="0,10,0,0"/>
+      </Grid>
+      <WrapPanel Margin="0,20,0,0">
+        <Button Content="一键清理日志" Command="{Binding ClearLogsCommand}" Margin="0,0,16,0" AutomationProperties.AutomationId="Logs.Clear"/>
+        <TextBlock Text="资源库、任务和资源文件会保留。" Style="{StaticResource SubtleText}" VerticalAlignment="Center"/>
+      </WrapPanel>
+      <TextBlock Text="{Binding LoggingNotice}" Style="{StaticResource SubtleText}" Margin="0,12,0,0" AutomationProperties.LiveSetting="Polite"/>
+      <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,24"/>
+      <TextBlock Text="保存位置" FontWeight="SemiBold" Margin="0,0,0,8"/>
+      <TextBox Text="{Binding LogDirectory,Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" AutomationProperties.Name="日志保存位置"/>
+      <WrapPanel Margin="0,16,0,0">
+        <Button Content="打开日志文件夹" Command="{Binding OpenLogsFolderCommand}" Margin="0,0,8,8"/>
+        <Button Content="导出诊断摘要" Command="{Binding ExportDiagnosticsCommand}" AutomationProperties.Name="导出脱敏诊断摘要" Margin="0,0,0,8"/>
+      </WrapPanel>
+      <TextBlock Text="{Binding DiagnosticsNotice}" Style="{StaticResource SubtleText}" Margin="0,4,0,0"/>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

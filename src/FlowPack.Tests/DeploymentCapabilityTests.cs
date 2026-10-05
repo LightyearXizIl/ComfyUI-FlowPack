@@ -26,7 +26,7 @@ public sealed class DeploymentCapabilityTests : IDisposable
         { ConfigurationRoot = _root, DesktopLayout = "standalone-native" };
     }
     [Fact]
-    public void Default_has_no_qualification_and_old_records_cannot_inherit_it()
+    public void Older_versions_and_incomplete_records_cannot_inherit_current_qualification()
     {
         var instance = Instance();
         var result = new DeploymentCapabilityProvider(readVersion: _ => "1.0.47.0").Evaluate(instance, false);
@@ -35,6 +35,19 @@ public sealed class DeploymentCapabilityTests : IDisposable
         Assert.False(provider.Evaluate(instance with { ConfigurationRoot = null }, false).Allows(false));
         Assert.False(provider.Evaluate(instance with { Generation = "legacy" }, false).Allows(false));
         Assert.False(provider.Evaluate(instance with { Issues = ["配置失效"] }, false).Allows(false));
+    }
+    [Theory]
+    [InlineData("standalone-native")]
+    [InlineData("standalone-adopted")]
+    public void Shipped_qualification_matches_verified_Desktop_114_layouts_only(string layout)
+    {
+        var instance = Instance() with { DesktopLayout = layout };
+        var provider = new DeploymentCapabilityProvider(readVersion: _ => "1.1.4.0");
+        var result = provider.Evaluate(instance, true);
+        Assert.True(result.Allows(true));
+        Assert.Equal("desktop-1.1.4-transfer-20261005", result.EvidenceId);
+        Assert.False(new DeploymentCapabilityProvider(readVersion: _ => "1.1.4.1").Evaluate(instance, true).Allows(true));
+        Assert.False(provider.Evaluate(instance with { DesktopLayout = "unknown" }, true).Allows(true));
     }
     [Fact]
     public void Qualification_is_exact_version_layout_and_python_scope()

@@ -44,7 +44,9 @@ internal sealed record AcceptanceScope(string FixtureRoot, string DesktopProfile
         // This is permission to perform a bounded test, never evidence that qualification passed.
         var candidate = new DeploymentCapabilityProvider([
             new("1.0.47", "standalone-native", true, "acceptance-in-progress-not-production-qualified"),
-            new("1.0.47", "standalone-adopted", true, "acceptance-in-progress-not-production-qualified")
+            new("1.0.47", "standalone-adopted", true, "acceptance-in-progress-not-production-qualified"),
+            new("1.1.4", "standalone-native", true, "acceptance-in-progress-not-production-qualified"),
+            new("1.1.4", "standalone-adopted", true, "acceptance-in-progress-not-production-qualified")
         ]).Evaluate(instance, requiresPython);
         reasons.AddRange(candidate.Reasons);
         return candidate with { CanInstallFiles = reasons.Count == 0, CanInstallPython = reasons.Count == 0,

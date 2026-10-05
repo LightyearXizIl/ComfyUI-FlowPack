@@ -1,35 +1,18 @@
 using System.Windows;
+using System.ComponentModel;
+using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace FlowPack.App;
 public partial class MainWindow : Window
 {
-    private ExportPreviewWindow? _exportPreview;
-    private IInputElement? _taskReturnFocus;
-    private void OnTasksToggle(object sender, RoutedEventArgs e)
-    {
-        if (TaskPanel.Visibility == Visibility.Visible) { CloseTaskPanel(); return; }
-        _taskReturnFocus = System.Windows.Input.Keyboard.FocusedElement;
-        TaskPanel.Visibility = Visibility.Visible;
-        CloseTasksButton.Focus();
-    }
-    private void OnTasksClose(object sender, RoutedEventArgs e) => CloseTaskPanel();
-    private void OnTaskPanelKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
-    {
-        if (e.Key != System.Windows.Input.Key.Escape) return;
-        CloseTaskPanel(); e.Handled = true;
-    }
-    private void CloseTaskPanel()
-    {
-        TaskPanel.Visibility = Visibility.Collapsed;
-        if (_taskReturnFocus is UIElement { IsVisible: true, IsEnabled: true } element) element.Focus();
-        else TasksButton.Focus();
-        _taskReturnFocus = null;
-    }
+    private IInputElement? _detailReturnFocus;
+    private bool _detailsWereOpen;
     public MainWindow(ShellViewModel? viewModel = null, bool initializeWorkspace = false)
     {
         InitializeComponent();
         DataContext = viewModel ?? new ShellViewModel(desktopDetector: new FlowPack.ComfyUI.ComfyDesktopDetector());
-        if (DataContext is ShellViewModel initial) initial.ExportPreviewRequested += OnExportPreviewRequested;
+        if (DataContext is ShellViewModel detailsModel) detailsModel.PropertyChanged += OnSecondaryPanelChanged;
         Loaded += async (_, _) =>
         {
             if ((viewModel is null || initializeWorkspace) && DataContext is ShellViewModel vm)
@@ -37,19 +20,19 @@ public partial class MainWindow : Window
                 await vm.InitializeWorkspaceAsync();
             }
         };
-        Closed += (_, _) => { if (DataContext is ShellViewModel vm) { vm.ExportPreviewRequested -= OnExportPreviewRequested; vm.DetachWindow(); } };
+        Closed += (_, _) => { if (DataContext is ShellViewModel vm) { vm.PropertyChanged -= OnSecondaryPanelChanged; vm.DetachWindow(); } };
     }
-    private void OnExportPreviewRequested(object? sender, EventArgs e)
+    private void OnSecondaryPanelChanged(object? sender, PropertyChangedEventArgs e)
     {
-        // Return to the command first so its busy state is cleared before entering the modal message loop.
-        Dispatcher.BeginInvoke(new Action(() =>
+        if (e.PropertyName is not (nameof(ShellViewModel.SecondaryPanel) or nameof(ShellViewModel.IsSecondaryPanelOpen)) || sender is not ShellViewModel vm || _detailsWereOpen == vm.IsSecondaryPanelOpen) return;
+        _detailsWereOpen = vm.IsSecondaryPanelOpen;
+        if (vm.IsSecondaryPanelOpen) _detailReturnFocus = Keyboard.FocusedElement;
+        _ = Dispatcher.BeginInvoke(() =>
         {
-            if (!IsLoaded || sender is not ShellViewModel vm) return;
-            if (_exportPreview is not null) { _exportPreview.Activate(); return; }
-            _exportPreview = new ExportPreviewWindow(vm) { Owner = this };
-            try { _exportPreview.ShowDialog(); }
-            finally { _exportPreview = null; }
-        }));
+            if (!IsLoaded || !IsVisible) return;
+            if (vm.IsSecondaryPanelOpen) SecondaryPanelHost.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
+            else if (_detailReturnFocus is UIElement { IsVisible: true, IsEnabled: true } target) target.Focus();
+        }, DispatcherPriority.Input);
     }
     private void OnFileDragOver(object sender, DragEventArgs e)
     {
@@ -57,6 +40,11 @@ public partial class MainWindow : Window
         var files = e.Data.GetData(DataFormats.FileDrop) as string[];
         e.Effects = files is { Length: 1 } && DataContext is ShellViewModel { CoreReady: true }
             ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+    private void OnSecondaryBackdropMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (DataContext is ShellViewModel vm) vm.CloseSecondaryPanelCommand.Execute(null);
         e.Handled = true;
     }
     private async void OnFileDrop(object sender, DragEventArgs e)

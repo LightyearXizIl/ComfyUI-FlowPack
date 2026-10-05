@@ -1,4 +1,4 @@
-<Window x:Class="FlowPack.App.MainWindow"
+﻿<Window x:Class="FlowPack.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:automation="clr-namespace:System.Windows.Automation;assembly=PresentationCore"
@@ -12,51 +12,28 @@
         Icon="Assets/FlowPack.ico"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource WindowBrush}" Foreground="{DynamicResource TextBrush}"
-        FontFamily="Segoe UI" AllowDrop="True" PreviewDragOver="OnFileDragOver" Drop="OnFileDrop">
+        FontFamily="Segoe UI, Microsoft YaHei UI" FontSize="{DynamicResource BodyFontSize}"
+        AllowDrop="True" PreviewDragOver="OnFileDragOver" Drop="OnFileDrop">
+  <Window.InputBindings><KeyBinding Key="Escape" Command="{Binding CloseSecondaryPanelCommand}"/></Window.InputBindings>
   <Window.Resources>
     <DataTemplate x:Key="HomePageTemplate"><views:HomeView /></DataTemplate>
     <DataTemplate x:Key="LibraryPageTemplate"><views:LibraryView /></DataTemplate>
     <DataTemplate x:Key="PackagingPageTemplate"><views:PackageWizardView /></DataTemplate>
     <DataTemplate x:Key="InstallPageTemplate"><views:InstallView /></DataTemplate>
-    <DataTemplate x:Key="TasksPageTemplate"><views:TasksView /></DataTemplate>
     <DataTemplate x:Key="SettingsPageTemplate"><views:SettingsView /></DataTemplate>
+    <DataTemplate x:Key="SecondaryPageTemplate"><views:SecondaryDetailsView /></DataTemplate>
+    <Style x:Key="SecondaryBackground" TargetType="FrameworkElement"><Style.Triggers><DataTrigger Binding="{Binding IsSecondaryPanelOpen}" Value="True"><Setter Property="IsEnabled" Value="False"/></DataTrigger></Style.Triggers></Style>
 
-    <Style x:Key="NavButtonBase" TargetType="Button" BasedOn="{StaticResource ButtonBase}">
-      <Setter Property="MinHeight" Value="64" />
-      <Setter Property="Padding" Value="14,18,14,14" />
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
-      <Setter Property="BorderBrush" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0,0,0,3" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-      <Setter Property="VerticalContentAlignment" Value="Center" />
-      <Setter Property="Template">
-        <Setter.Value>
-          <ControlTemplate TargetType="Button">
-            <Border x:Name="NavBorder"
-                    Background="{TemplateBinding Background}"
-                    BorderBrush="{TemplateBinding BorderBrush}"
-                    BorderThickness="{TemplateBinding BorderThickness}"
-                    Padding="{TemplateBinding Padding}">
-              <ContentPresenter HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                RecognizesAccessKey="True" />
-            </Border>
-            <ControlTemplate.Triggers>
-              <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
-              </Trigger>
-              <Trigger Property="IsPressed" Value="True">
-                <Setter TargetName="NavBorder" Property="Opacity" Value="0.68" />
-              </Trigger>
-              <Trigger Property="IsEnabled" Value="False">
-                <Setter TargetName="NavBorder" Property="Opacity" Value="0.45" />
-              </Trigger>
-            </ControlTemplate.Triggers>
-          </ControlTemplate>
-        </Setter.Value>
-      </Setter>
+    <Style x:Key="SettingsButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding CurrentPage}" Value="Settings">
+          <Setter Property="Background" Value="{DynamicResource AccentSoftBrush}"/>
+          <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+        </DataTrigger>
+      </Style.Triggers>
     </Style>
+
+    <Style x:Key="NavButtonBase" TargetType="Button" BasedOn="{StaticResource NavigationButton}"/>
 
     <Style x:Key="HomeNavButton" TargetType="Button" BasedOn="{StaticResource NavButtonBase}">
       <Style.Triggers>
@@ -102,11 +79,12 @@
 
   <Grid x:Name="RootLayout">
     <Grid.RowDefinitions>
-      <RowDefinition Height="64" />
+      <RowDefinition Height="64" /><RowDefinition Height="Auto"/>
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
     <Border Grid.Row="0"
+             Style="{StaticResource SecondaryBackground}"
             Background="{DynamicResource WindowBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="0,0,0,1">
@@ -164,11 +142,8 @@
             <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding SelectedInstance}" Value="{x:Null}"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
           </TextBlock>
           </Grid>
-          <Button x:Name="TasksButton" Content="&#xE823;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" Style="{StaticResource IconButton}"
-                  ToolTip="{Binding Text[Nav.Tasks]}" automation:AutomationProperties.Name="{Binding Text[Nav.Tasks]}"
-                  Click="OnTasksToggle" />
           <Button Content="&#xE713;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                  Style="{StaticResource IconButton}"
+                  Style="{StaticResource SettingsButton}"
                   ToolTip="{Binding Text[Nav.Settings]}"
                   FontSize="18"
                   automation:AutomationProperties.Name="{Binding Text[Nav.Settings]}"
@@ -178,34 +153,37 @@
       </Grid>
     </Border>
 
-      <ContentControl x:Name="PageHost" Grid.Row="1"
+    <Border Grid.Row="1" Background="{DynamicResource SurfaceBrush}" Padding="32,10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+     <Border.Style><Style TargetType="Border" BasedOn="{StaticResource SecondaryBackground}"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding OperationVisible}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Border.Style>
+     <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="160"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+      <TextBlock Text="{Binding OperationText}" TextTrimming="CharacterEllipsis" ToolTip="{Binding OperationText}" VerticalAlignment="Center" AutomationProperties.AutomationId="Operation.Text"/>
+      <ProgressBar Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding OperationPercent,Mode=OneWay}" IsIndeterminate="{Binding OperationIndeterminate}" Height="6" Margin="20,0" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}" AutomationProperties.Name="当前阶段进度"/>
+      <WrapPanel Grid.Column="2"><Button Content="取消" Command="{Binding CancelOperationCommand}" Margin="0,0,8,0"/><Button Content="收起" Command="{Binding DismissOperationCommand}"/></WrapPanel>
+     </Grid>
+    </Border>
+      <ContentControl x:Name="PageHost" Grid.Row="2"
                       Margin="32,28,32,24"
                       HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
                       Content="{Binding}"
                       automation:AutomationProperties.AutomationId="PageHost">
         <ContentControl.Style>
-          <Style TargetType="ContentControl">
+          <Style TargetType="ContentControl" BasedOn="{StaticResource SecondaryBackground}">
             <Setter Property="ContentTemplate" Value="{StaticResource HomePageTemplate}" />
             <Style.Triggers>
               <DataTrigger Binding="{Binding CurrentPage}" Value="Library"><Setter Property="ContentTemplate" Value="{StaticResource LibraryPageTemplate}" /></DataTrigger>
               <DataTrigger Binding="{Binding CurrentPage}" Value="Packaging"><Setter Property="ContentTemplate" Value="{StaticResource PackagingPageTemplate}" /></DataTrigger>
               <DataTrigger Binding="{Binding CurrentPage}" Value="Install"><Setter Property="ContentTemplate" Value="{StaticResource InstallPageTemplate}" /></DataTrigger>
-              <DataTrigger Binding="{Binding CurrentPage}" Value="Tasks"><Setter Property="ContentTemplate" Value="{StaticResource TasksPageTemplate}" /></DataTrigger>
               <DataTrigger Binding="{Binding CurrentPage}" Value="Settings"><Setter Property="ContentTemplate" Value="{StaticResource SettingsPageTemplate}" /></DataTrigger>
             </Style.Triggers>
           </Style>
         </ContentControl.Style>
       </ContentControl>
-    <Border x:Name="TaskPanel" Grid.Row="1" Width="440" HorizontalAlignment="Right" Visibility="Collapsed"
-            Background="{DynamicResource WindowBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0"
-            Padding="24" Panel.ZIndex="5" PreviewKeyDown="OnTaskPanelKeyDown"
-            KeyboardNavigation.TabNavigation="Cycle" AutomationProperties.AutomationId="TaskPanel">
-      <Grid>
-        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-        <Button x:Name="CloseTasksButton" Content="关闭任务面板" HorizontalAlignment="Right" Margin="0,0,0,12"
-                Style="{StaticResource SecondaryButton}" Click="OnTasksClose"/>
-        <views:TasksView Grid.Row="1"/>
+      <Grid x:Name="SecondaryOverlay" Grid.RowSpan="3" Panel.ZIndex="20">
+        <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsSecondaryPanelOpen}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Grid.Style>
+        <Border x:Name="SecondaryBackdrop" Background="#80000000" MouseLeftButtonDown="OnSecondaryBackdropMouseDown"/>
+        <ContentControl x:Name="SecondaryPanelHost" Content="{Binding}" Width="640" Height="540" HorizontalAlignment="Center" VerticalAlignment="Center" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Margin="24">
+          <ContentControl.Style><Style TargetType="ContentControl"><Style.Triggers><DataTrigger Binding="{Binding IsSecondaryPanelOpen}" Value="True"><Setter Property="ContentTemplate" Value="{StaticResource SecondaryPageTemplate}"/></DataTrigger></Style.Triggers></Style></ContentControl.Style>
+        </ContentControl>
       </Grid>
-    </Border>
   </Grid>
 </Window>

@@ -6,9 +6,10 @@ using FlowPack.Core;
 namespace FlowPack.Infrastructure;
 
 /// <summary>UI-facing library access. Database writes run only in the persistent Worker.</summary>
-public sealed class WorkerLibraryClient(string libraryPath, bool allowWorkerLaunch = true) : IAsyncDisposable
+public sealed class WorkerLibraryClient(string libraryPath, bool allowWorkerLaunch = true, ApplicationLog? log = null, string? desktopProfile = null) : IAsyncDisposable
 {
     public string LibraryPath { get; } = Path.GetFullPath(libraryPath);
+    public string? DesktopProfile { get; } = DesktopProfileOptions.NormalizeAndValidate(desktopProfile);
     private string? _pipe;
     private string? _secret;
     private readonly SemaphoreSlim _connection = new(1);
@@ -27,8 +28,10 @@ public sealed class WorkerLibraryClient(string libraryPath, bool allowWorkerLaun
 
     public async Task<T> RunAsync<T>(string operation, object input, IProgress<WorkerJob>? progress = null, CancellationToken token = default)
     {
+        log?.Write(LogSeverity.Information, "worker.job.started", operation);
         var job = await CallAsync<WorkerJob>(operation, input, token: token).ConfigureAwait(false);
         job = await WaitForJobAsync(job.Id, progress, token).ConfigureAwait(false);
+        log?.Write(LogSeverity.Information, "worker.job.completed", operation);
         return job.Result is { } result ? result.Deserialize<T>(JsonOptions)! : throw new InvalidDataException("Worker 结果为空。");
     }
 
@@ -42,23 +45,25 @@ public sealed class WorkerLibraryClient(string libraryPath, bool allowWorkerLaun
             job = await CallAsync<WorkerJob>("job.get", job.Id, token: token).ConfigureAwait(false);
         }
         progress?.Report(job);
-        if (job.State != "Completed") throw new IOException(job.Error ?? job.Stage);
+        if (job.State != "Completed") { log?.Write(LogSeverity.Error, "worker.job.failed", job.Operation + "; " + job.State); throw new IOException(job.Error ?? job.Stage); }
         return job;
     }
 
     public async Task<T> CallAsync<T>(string operation, object input, string? requestId = null, CancellationToken token = default, bool allowEmptyResponse = false)
     {
         var id = requestId ?? Guid.NewGuid().ToString("N");
+        log?.Write(LogSeverity.Detail, "worker.request", operation);
         WorkerResponse response;
         try { response = await SendAsync().ConfigureAwait(false); }
         catch (Exception ex) when (ex is IOException or OperationCanceledException && !token.IsCancellationRequested)
         {
+            log?.WriteError("worker.connection.retry", ex);
             token.ThrowIfCancellationRequested();
             await _connection.WaitAsync(token).ConfigureAwait(false);
             try { _pipe = null; _secret = null; } finally { _connection.Release(); }
             response = await SendAsync().ConfigureAwait(false);
         }
-        if (!response.Succeeded) throw new IOException(response.Error?.Message ?? "Worker 请求失败。");
+        if (!response.Succeeded) { log?.Write(LogSeverity.Error, "worker.request.failed", operation); throw new IOException(response.Error?.Message ?? "Worker 请求失败。"); }
         if (response.Payload is null && allowEmptyResponse && default(T) is null) return default!;
         return response.Payload is { } value ? value.Deserialize<T>(JsonOptions)! : throw new InvalidDataException("Worker 响应为空。");
         async Task<WorkerResponse> SendAsync()
@@ -90,16 +95,25 @@ public sealed class WorkerLibraryClient(string libraryPath, bool allowWorkerLaun
                 try
                 {
                     var session = JsonSerializer.Deserialize<WorkerSession>(await File.ReadAllTextAsync(sessionFile, token).ConfigureAwait(false));
-                    if (session is not null && await PingAsync(session, token).ConfigureAwait(false)) { _pipe = session.Pipe; _secret = session.Secret; return; }
+                    if (session is not null && await PingAsync(session, token).ConfigureAwait(false))
+                    {
+                        if (!DesktopProfileOptions.SessionMatches(DesktopProfile, session.DesktopProfile))
+                            throw new InvalidOperationException("此资源库的 Worker 正在使用另一份 Desktop 配置。请使用独立资源库，或等待原 Worker 退出后重试。");
+                        _pipe = session.Pipe; _secret = session.Secret; return;
+                    }
                 }
                 catch (Exception ex) when (ex is IOException or JsonException or OperationCanceledException) { token.ThrowIfCancellationRequested(); }
             }
             if (!allowWorkerLaunch) throw new IOException("指定的 Worker 会话不可用；此连接不允许启动其他 Worker，请重新启动验收宿主后重试。");
-            var created = new WorkerSession("flowpack-" + Guid.NewGuid().ToString("N"), Convert.ToHexString(RandomNumberGenerator.GetBytes(32)));
+            var created = new WorkerSession("flowpack-" + Guid.NewGuid().ToString("N"), Convert.ToHexString(RandomNumberGenerator.GetBytes(32)), DesktopProfile);
             var worker = FindWorker();
             var start = new ProcessStartInfo(worker.EndsWith(".dll", StringComparison.OrdinalIgnoreCase) ? "dotnet" : worker) { UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden };
             if (worker.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)) start.ArgumentList.Add(worker);
             foreach (var item in new[] { "--pipe", created.Pipe, "--secret", created.Secret, "--library", LibraryPath }) start.ArgumentList.Add(item);
+            if (DesktopProfile is not null)
+            {
+                start.ArgumentList.Add("--desktop-profile"); start.ArgumentList.Add(DesktopProfile);
+            }
             using var process = Process.Start(start) ?? throw new IOException("无法启动 Worker。");
             for (var i = 0; i < 30; i++)
             {
@@ -152,5 +166,5 @@ public sealed class WorkerLibraryClient(string libraryPath, bool allowWorkerLaun
         throw new FileNotFoundException("未找到同版本 Worker，请重新安装 FlowPack。");
     }
     public ValueTask DisposeAsync() { _connection.Dispose(); return ValueTask.CompletedTask; }
-    private sealed record WorkerSession(string Pipe, string Secret);
+    private sealed record WorkerSession(string Pipe, string Secret, string? DesktopProfile = null);
 }

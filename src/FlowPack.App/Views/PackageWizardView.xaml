@@ -1,32 +1,23 @@
 <UserControl x:Class="FlowPack.App.Views.PackageWizardView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" AutomationProperties.AutomationId="Page.Packaging">
- <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <StackPanel Margin="0,0,0,20">
-   <TextBlock Text="我的资源 / 导出工具" Style="{StaticResource StepLabel}"/>
-   <TextBlock Text="打包资源" Style="{StaticResource PageTitle}"/>
-   <TextBlock Text="选择资源 → 检查依赖与内容 → 保存 ZIP。" Style="{StaticResource SubtleText}" Margin="0,8,0,0"/>
-  </StackPanel>
-  <Border Grid.Row="1" Style="{StaticResource SectionCard}"><StackPanel>
-   <DockPanel><WrapPanel DockPanel.Dock="Right" Margin="12,0,0,0">
-    <Button Content="选择资源" Command="{Binding NavigateCommand}" CommandParameter="Library" Margin="0,0,8,8"/>
-    <Button Content="生成导出预览" Command="{Binding PreviewZipCommand}" Margin="0,0,0,8"/>
-   </WrapPanel><TextBlock Text="导出选项" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/></DockPanel>
-   <WrapPanel Margin="0,8,0,8"><CheckBox Content="自动包含工作流依赖" IsChecked="{Binding IncludeDependencies}" Margin="0,0,20,8"/>
-    <CheckBox Content="允许导出带缺失说明的不完整包" IsChecked="{Binding AllowPartialExport}" Margin="0,0,0,8"/></WrapPanel>
-   <TextBlock Text="{Binding ExportSummary}" TextWrapping="Wrap"/>
-  </StackPanel></Border>
-  <DataGrid Grid.Row="2" ItemsSource="{Binding ExportFiles}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"><DataGrid.Columns>
-   <DataGridTextColumn Header="ZIP 内路径" Binding="{Binding ArchivePath}" Width="*"/>
-   <DataGridTextColumn Header="大小（字节）" Binding="{Binding SizeBytes,StringFormat=N0}" Width="125"/>
-   <DataGridTextColumn Header="SHA-256" Binding="{Binding Sha256}" Width="220"/>
-  </DataGrid.Columns></DataGrid>
-  <Grid Grid.Row="3" Margin="0,12,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-   <StackPanel><TextBlock Text="{Binding CoreNotice}" Style="{StaticResource SubtleText}"/>
-    <Expander Header="旧草稿兼容工具" Margin="0,8,12,0"><WrapPanel Margin="0,8,0,0">
-     <Button Content="导入旧草稿" AutomationProperties.Name="导入资源包草稿" Command="{Binding ImportDraftCommand}" Margin="0,0,8,8"/>
-     <Button Content="导出旧草稿" Command="{Binding ExportDraftCommand}" Margin="0,0,0,8"/>
-    </WrapPanel></Expander>
-   </StackPanel>
-   <Button Grid.Column="1" Content="保存 ZIP" Command="{Binding SaveZipCommand}" Style="{StaticResource PrimaryButton}" VerticalAlignment="Top" Margin="16,0,0,0"/>
-  </Grid>
+ <Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <DockPanel Margin="0,0,0,16">
+   <Button DockPanel.Dock="Right" Content="返回资源库" Command="{Binding ReturnToResourcesCommand}" VerticalAlignment="Top"/>
+   <StackPanel><TextBlock Text="导出资源" Style="{StaticResource PageTitle}"/><TextBlock Text="确认这次要带走的资源，取消勾选可将它留在当前电脑。" Style="{StaticResource SubtleText}" Margin="0,8,0,0"/></StackPanel>
+  </DockPanel>
+  <Border Grid.Row="1" Style="{StaticResource Card}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <DockPanel Margin="0,0,0,12"><Button DockPanel.Dock="Right" Content="重新添加依赖" Command="{Binding ReAddExportDependenciesCommand}" ToolTip="重新加入当前勾选工作流用到的可确认依赖"/><StackPanel><TextBlock Text="导出清单" Style="{StaticResource SectionTitle}"/><TextBlock Text="{Binding ExportContentsSummary}" Style="{StaticResource SubtleText}" Margin="0,6,0,0"/></StackPanel></DockPanel>
+   <ListBox Grid.Row="1" ItemsSource="{Binding ExportSelectionRows}" IsEnabled="{Binding CoreReady}" BorderThickness="0" Background="Transparent" Foreground="{DynamicResource TextBrush}" HorizontalContentAlignment="Stretch" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True" AutomationProperties.Name="最终导出清单"><ListBox.ItemTemplate><DataTemplate>
+    <Border Padding="0,10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"><DockPanel>
+     <TextBlock DockPanel.Dock="Right" Text="{Binding KindLabel}" Style="{StaticResource SubtleText}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+     <CheckBox IsChecked="{Binding IsSelected,Mode=TwoWay}" AutomationProperties.Name="{Binding Name}"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}"/></CheckBox>
+    </DockPanel></Border>
+   </DataTemplate></ListBox.ItemTemplate></ListBox>
+  </Grid></Border>
+  <Expander Grid.Row="2" Header="导出详情与高级选项" Margin="0,12,0,0"><ScrollViewer MaxHeight="170" Style="{StaticResource PageScroll}"><StackPanel Margin="0,8,0,0">
+   <TextBlock Text="{Binding ExportSummary}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+   <DataGrid ItemsSource="{Binding ExportFiles}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" MaxHeight="130" AutomationProperties.Name="实际 ZIP 内容预览"><DataGrid.Columns><DataGridTextColumn Header="包内路径" Binding="{Binding ArchivePath}" Width="*"/><DataGridTextColumn Header="字节" Binding="{Binding SizeBytes,StringFormat=N0}" Width="110"/></DataGrid.Columns></DataGrid>
+   <WrapPanel Margin="0,8,0,0"><Button Content="导入旧草稿" Command="{Binding ImportDraftCommand}" Margin="0,0,8,0"/><Button Content="导出旧草稿" Command="{Binding ExportDraftCommand}"/><CheckBox Content="允许带缺失说明的不完整包" IsChecked="{Binding AllowPartialExport}" Margin="16,0,0,0" VerticalAlignment="Center"/></WrapPanel>
+  </StackPanel></ScrollViewer></Expander>
+  <DockPanel Grid.Row="3" Margin="0,16,0,0"><Button DockPanel.Dock="Right" Content="导出 ZIP…" Command="{Binding SaveZipCommand}" Style="{StaticResource PrimaryButton}" MinWidth="130"/><TextBlock Text="{Binding ExportStatus}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,16,0" AutomationProperties.Name="导出状态"/></DockPanel>
  </Grid>
 </UserControl>

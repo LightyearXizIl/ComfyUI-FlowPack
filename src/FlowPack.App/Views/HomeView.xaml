@@ -1,41 +1,75 @@
-<UserControl x:Class="FlowPack.App.Views.HomeView"
+﻿<UserControl x:Class="FlowPack.App.Views.HomeView"
  xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
  xmlns:views="clr-namespace:FlowPack.App.Views" AutomationProperties.AutomationId="Page.Home">
- <ScrollViewer Style="{StaticResource PageScroll}"><StackPanel>
-  <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}"/>
-  <TextBlock Text="管理所选实例的资源，或导入资源包检查并安装。" Style="{StaticResource SubtleText}" Margin="0,8,0,24"/>
-  <Border Style="{StaticResource SectionCard}"><StackPanel>
-   <TextBlock Text="当前 Desktop 实例" Style="{StaticResource StepLabel}"/>
-   <DockPanel Margin="0,0,0,12">
-    <WrapPanel DockPanel.Dock="Right" Margin="16,0,0,0">
-     <Button Content="重新检测与扫描" Command="{Binding RefreshInstancesCommand}" Margin="0,0,8,8"/>
-     <Button Content="手动关联目录" Command="{Binding AssociateInstanceCommand}" Margin="0,0,0,8"/>
-    </WrapPanel>
-    <TextBlock Text="{Binding SelectedInstance.DisplayName,TargetNullValue=尚未选择实例,FallbackValue=尚未选择实例}" Style="{StaticResource SectionTitle}" TextWrapping="Wrap" VerticalAlignment="Center"/>
-   </DockPanel>
-   <views:FolderShortcutsView/>
-   <Expander Header="查看安装位置与资源目录" Margin="0,4,0,0">
-    <TextBlock Text="{Binding InstancePaths}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-   </Expander>
-  </StackPanel></Border>
-  <Grid Margin="0,0,0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-   <Border Style="{StaticResource Card}"><StackPanel>
-    <TextBlock Text="导入与安装" Style="{StaticResource SectionTitle}"/>
-    <TextBlock Text="拖入 ZIP、工作流或目录，核对资源用途和缺失依赖，再检查安装计划。" Style="{StaticResource SubtleText}" Margin="0,8,0,20"/>
-    <Button Content="导入 ZIP / 工作流" Command="{Binding ImportNativeCommand}" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Left"/>
-   </StackPanel></Border>
-   <Border Grid.Column="2" Style="{StaticResource Card}"><StackPanel>
-    <TextBlock Text="管理与分享" Style="{StaticResource SectionTitle}"/>
-    <TextBlock Text="查看工作流、模型和节点。勾选要分享的资源，核对导出预览后保存 ZIP。" Style="{StaticResource SubtleText}" Margin="0,8,0,20"/>
-    <Button Content="选择资源并打包" Command="{Binding NavigateCommand}" CommandParameter="Library" HorizontalAlignment="Left"/>
-   </StackPanel></Border>
+ <UserControl.Resources>
+  <Style x:Key="HomeButton" TargetType="Button" BasedOn="{StaticResource StandardActionButton}"/>
+  <Style TargetType="Button" BasedOn="{StaticResource HomeButton}"/>
+  <Style x:Key="FolderShortcutButton" TargetType="Button" BasedOn="{StaticResource HomeButton}"><Setter Property="Margin" Value="0,0,8,8"/><Style.Triggers><DataTrigger Binding="{Binding SelectedInstance}" Value="{x:Null}"><Setter Property="IsEnabled" Value="False"/></DataTrigger></Style.Triggers></Style>
+<BooleanToVisibilityConverter x:Key="HomeVisibility"/></UserControl.Resources>
+ <Grid>
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*" MaxHeight="460"/></Grid.RowDefinitions>
+  <StackPanel Margin="0,0,0,24">
+   <TextBlock Text="{Binding PageTitle}" Style="{StaticResource PageTitle}"/>
+   <TextBlock Text="管理所选实例的资源，或导入资源包检查并安装。" Style="{StaticResource SubtleText}" Margin="0,8,0,0"/>
+  </StackPanel>
+  <Grid Grid.Row="1">
+   <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="24"/><ColumnDefinition Width="300"/></Grid.ColumnDefinitions>
+   <Grid AutomationProperties.AutomationId="Home.Actions">
+    <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="16"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <Border Style="{StaticResource Card}" AutomationProperties.AutomationId="Home.Instance">
+     <StackPanel>
+      <DockPanel Margin="0,0,0,8">
+       <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="12,0,0,0">
+        <Button Content="重新扫描" Command="{Binding RefreshInstancesCommand}" Margin="0,0,8,0"/>
+        <Button Content="关联目录" Command="{Binding AssociateInstanceCommand}"/>
+       </StackPanel>
+       <TextBlock Text="当前实例" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
+      </DockPanel>
+      <TextBlock Text="{Binding SelectedInstance.DisplayName,TargetNullValue=尚未选择实例,FallbackValue=尚未选择实例}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" ToolTip="{Binding SelectedInstance.DisplayName}" Margin="0,0,0,4"/>
+      <TextBlock Text="{Binding InstanceVersions}" Style="{StaticResource SubtleText}" Margin="0,0,0,8"/>
+      <WrapPanel><views:FolderShortcutsView ShowLabel="False"/><Button Content="版本详情" Command="{Binding OpenInstanceDetailsCommand}" CommandParameter="Versions" Margin="0,0,8,8" AutomationProperties.AutomationId="Home.Versions"/><Button Content="资源目录" Command="{Binding OpenInstanceDetailsCommand}" CommandParameter="Directories" Margin="0,0,0,8" AutomationProperties.AutomationId="Home.Directories"/></WrapPanel>
+     </StackPanel>
+    </Border>
+    <Border Grid.Row="2" Style="{StaticResource Card}" MinHeight="158" AutomationProperties.AutomationId="Home.Shortcuts">
+     <Grid>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="33"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <TextBlock Text="导入资源" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Grid.Row="1" Text="选择文件，自动分析后安装。" Style="{StaticResource SubtleText}" Margin="0,8,0,16"/>
+      <Button Grid.Row="2" Content="导入资源" Command="{Binding NavigateCommand}" CommandParameter="Install" Style="{StaticResource HomeButton}" HorizontalAlignment="Left"/>
+      <Border Grid.Column="1" Grid.RowSpan="3" Width="1" Background="{DynamicResource BorderBrush}"/>
+      <TextBlock Grid.Column="2" Text="导出资源" Style="{StaticResource SectionTitle}"/>
+      <TextBlock Grid.Column="2" Grid.Row="1" Text="选择资源，整理依赖后导出。" Style="{StaticResource SubtleText}" Margin="0,8,0,16"/>
+      <Button Grid.Column="2" Grid.Row="2" Content="导出资源" Command="{Binding BeginExportCommand}" HorizontalAlignment="Left"/>
+     </Grid>
+    </Border>
+   </Grid>
+   <Border Grid.Column="2" Style="{StaticResource Card}" AutomationProperties.AutomationId="Home.Status">
+    <Grid>
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+     <TextBlock Text="当前状态" Style="{StaticResource SectionTitle}"/>
+     <Border Grid.Row="1" Height="1" Background="{DynamicResource BorderBrush}" Margin="0,16,0,16"/>
+     <ScrollViewer Grid.Row="2" Style="{StaticResource PageScroll}" Padding="0"><StackPanel>
+      <TextBlock Text="{Binding HomeStatusTitle}" FontWeight="SemiBold" FontSize="16" AutomationProperties.AutomationId="Home.StatusText"/>
+      <TextBlock Text="{Binding HomeStatusSummary}" Style="{StaticResource SubtleText}" Margin="0,8,0,0" LineHeight="22" MaxHeight="66"
+       TextTrimming="CharacterEllipsis" ToolTip="{Binding HomeStatusSummary}"/>
+      <Grid Margin="0,20,0,12">
+       <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+       <Grid.RowDefinitions><RowDefinition Height="28"/><RowDefinition Height="28"/><RowDefinition Height="28"/></Grid.RowDefinitions>
+       <TextBlock Text="工作流" Style="{StaticResource SubtleText}" VerticalAlignment="Center"/>
+       <TextBlock Grid.Column="1" Text="{Binding HomeWorkflowCount}" FontWeight="SemiBold" VerticalAlignment="Center" AutomationProperties.AutomationId="Home.Workflows"/>
+       <TextBlock Grid.Row="1" Text="模型" Style="{StaticResource SubtleText}" VerticalAlignment="Center"/>
+       <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding HomeModelCount}" FontWeight="SemiBold" VerticalAlignment="Center" AutomationProperties.AutomationId="Home.Models"/>
+       <TextBlock Grid.Row="2" Text="节点包" Style="{StaticResource SubtleText}" VerticalAlignment="Center"/>
+       <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding HomeNodeCount}" FontWeight="SemiBold" VerticalAlignment="Center" AutomationProperties.AutomationId="Home.Nodes"/>
+      </Grid>
+      <TextBlock Text="{Binding HomeScanHint}" Style="{StaticResource SubtleText}"/>
+      <Button Content="查看详情" Command="{Binding OpenStatusDetailsCommand}" Margin="0,16,0,0" HorizontalAlignment="Left" AutomationProperties.AutomationId="Home.Details"
+       Visibility="{Binding HomeHasStatusDetails,Converter={StaticResource HomeVisibility}}">
+      </Button>
+     </StackPanel></ScrollViewer>
+    </Grid>
+   </Border>
   </Grid>
-  <Border Style="{StaticResource Card}"><StackPanel>
-   <DockPanel><Button DockPanel.Dock="Right" Content="查看后台任务" Command="{Binding NavigateCommand}" CommandParameter="Tasks" Margin="16,0,0,0"/>
-    <StackPanel><TextBlock Text="当前状态" Style="{StaticResource SectionTitle}"/>
-     <TextBlock Text="{Binding CoreNotice}" TextWrapping="Wrap" Margin="0,8,0,0"/>
-    </StackPanel>
-   </DockPanel>
-  </StackPanel></Border>
- </StackPanel></ScrollViewer>
+ </Grid>
 </UserControl>

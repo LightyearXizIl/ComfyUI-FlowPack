@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using FlowPack.Core;
 
 namespace FlowPack.Infrastructure;
 
@@ -19,7 +20,7 @@ public sealed class NativePackageStagingService
         string stagingRoot,
         int maximumEntries = DefaultMaximumEntries,
         long maximumUncompressedBytes = DefaultMaximumUncompressedBytes,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, IProgress<OperationProgress>? progress = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(zipPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(stagingRoot);
@@ -44,6 +45,8 @@ public sealed class NativePackageStagingService
                 throw new InvalidDataException($"资源包条目数超过安全上限（{maximumEntries}）。");
             }
 
+            var declaredBytes = archive.Entries.Aggregate(0L, (sum, e) => checked(sum + e.Length));
+            progress?.Report(new("解压资源包", 0, declaredBytes, "字节"));
             var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             long totalBytes = 0;
             var files = 0;
@@ -74,6 +77,7 @@ public sealed class NativePackageStagingService
                         throw new InvalidDataException("实际解压大小超过声明值或磁盘预算。");
                     crc = UpdateCrc(crc, buffer, read);
                     await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                    progress?.Report(new("解压资源包", totalBytes - entry.Length + written, declaredBytes, "字节"));
                 }
                 if (written != entry.Length || ~crc != entry.Crc32)
                     throw new InvalidDataException("ZIP 条目长度或 CRC 校验失败：" + entry.FullName);

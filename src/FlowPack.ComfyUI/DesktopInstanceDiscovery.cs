@@ -31,6 +31,7 @@ public sealed record InstanceDescriptor(
 public sealed class DesktopInstanceDiscovery(IDesktopPathProvider? paths = null, string? configurationRoot = null)
 {
     private readonly IDesktopPathProvider _paths = paths ?? new EnvironmentDesktopPathProvider();
+    private readonly bool _explicitConfigurationRoot = configurationRoot is not null;
     private string ConfigurationRoot => configurationRoot is null ? Path.Combine(_paths.RoamingApplicationData, "Comfy Desktop") : Path.GetFullPath(configurationRoot);
 
     public async Task<IReadOnlyList<InstanceDescriptor>> DiscoverAsync(CancellationToken token = default)
@@ -70,7 +71,7 @@ public sealed class DesktopInstanceDiscovery(IDesktopPathProvider? paths = null,
         // A legacy config can coexist with an adopted modern registration. Do not duplicate that data root.
         var legacyConfig = Path.Combine(_paths.RoamingApplicationData, "ComfyUI", "config.json");
         // An explicit launcher profile must never absorb the user's default legacy environment.
-        if (configurationRoot.Equals(Path.Combine(_paths.RoamingApplicationData, "Comfy Desktop"), StringComparison.OrdinalIgnoreCase) && File.Exists(legacyConfig))
+        if (!_explicitConfigurationRoot && File.Exists(legacyConfig))
         {
             var raw = await File.ReadAllTextAsync(legacyConfig, token);
             using var doc = JsonDocument.Parse(raw);
@@ -197,6 +198,8 @@ public sealed class DesktopInstanceDiscovery(IDesktopPathProvider? paths = null,
         var root = Path.GetFullPath(path);
         var registered = (await DiscoverAsync(token)).FirstOrDefault(x => SamePath(x.InstallRoot, root) || SamePath(x.DataDirectory, root));
         if (registered is not null) return registered;
+        if (_explicitConfigurationRoot)
+            throw new InvalidOperationException("所选目录不属于指定的 Desktop 配置；不会关联其他配置或手动目录。");
         var core = File.Exists(Path.Combine(root, "main.py")) ? root : Path.Combine(root, "ComfyUI");
         if (!File.Exists(Path.Combine(core, "main.py"))) throw new InvalidDataException("所选目录没有 ComfyUI 核心，无法建立只读资源关联。");
         var models = Path.Combine(core, "models"); var user = Path.Combine(core, "user");

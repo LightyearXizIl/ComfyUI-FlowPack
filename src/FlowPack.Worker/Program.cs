@@ -1,10 +1,21 @@
 using FlowPack.Infrastructure;
+using FlowPack.ComfyUI;
 
 if (args is ["--install-update", var updateRequest]) return await new UpdateBootstrap().RunAsync(updateRequest);
 
 var arguments = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-for (var i = 0; i + 1 < args.Length; i += 2) arguments[args[i].TrimStart('-')] = args[i + 1];
+if (args.Length % 2 != 0) return 2;
+for (var i = 0; i < args.Length; i += 2)
+{
+    if (!args[i].StartsWith("--", StringComparison.Ordinal)) return 2;
+    var key = args[i][2..].ToLowerInvariant();
+    if (key is not ("pipe" or "secret" or "library" or "desktop-profile") || !arguments.TryAdd(key, args[i + 1])) return 2;
+}
 if (!arguments.TryGetValue("pipe", out var pipe) || !arguments.TryGetValue("secret", out var secret) || !arguments.TryGetValue("library", out var library)) return 2;
+string? desktopProfile;
+try { desktopProfile = DesktopProfileOptions.FromArguments(args); }
+catch (Exception ex) when (ex is ArgumentException or IOException or InvalidDataException or UnauthorizedAccessException or System.Text.Json.JsonException)
+{ Console.Error.WriteLine(ex.Message); return 2; }
 library = Path.GetFullPath(library);
 Directory.CreateDirectory(Path.Combine(library, "state"));
 FileStream lease;
@@ -14,7 +25,9 @@ using (lease)
 using (var cancellation = new CancellationTokenSource())
 {
     Console.CancelKeyPress += (_, e) => { e.Cancel = true; cancellation.Cancel(); };
-    await using var service = new PersistentWorkerService(new ResourceLibraryDatabase(library));
+    var discovery = new DesktopInstanceDiscovery(configurationRoot: desktopProfile);
+    await using var service = new PersistentWorkerService(new ResourceLibraryDatabase(library), discovery.DiscoverAsync,
+        associate: discovery.AssociateAsync);
     try
     {
         await service.InitializeAsync(cancellation.Token);

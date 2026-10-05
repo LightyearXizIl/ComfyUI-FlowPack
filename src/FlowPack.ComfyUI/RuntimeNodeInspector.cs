@@ -126,7 +126,7 @@ public sealed class RuntimeNodeInspector(HttpClient http, IRuntimeEndpointResolv
 {
     public async Task<ResourceInventory> InspectAsync(ResourceInventory inventory, IReadOnlyList<InstanceDescriptor> peers, CancellationToken token = default)
     {
-        inventory = inventory with { RuntimeFingerprint = null, Resources = inventory.Resources.Select(x => x with { RuntimeChecked = false, LoadedNodeTypes = [] }).ToArray() };
+        inventory = inventory with { RuntimeFingerprint = null, RunningCoreVersion = null, FrontendListVerified = false, FrontendWorkflows = [], FrontendNotice = "尚未核对前端列表", Resources = inventory.Resources.Select(x => x with { RuntimeChecked = false, LoadedNodeTypes = [] }).ToArray() };
         try
         {
             var endpoint = await resolver.ResolveAsync(inventory.Instance, peers, token);
@@ -163,8 +163,25 @@ public sealed class RuntimeNodeInspector(HttpClient http, IRuntimeEndpointResolv
                 return resource with { LoadedNodeTypes = types, NodeTypes = (resource.NodeTypes ?? []).Concat(types).Distinct(StringComparer.Ordinal).ToArray(),
                     RuntimeChecked = true };
             }).ToArray();
-            return inventory with { Resources = resources, CoreNodeTypes = inventory.CoreNodeTypes.Concat(builtin).Distinct(StringComparer.Ordinal).ToArray(),
-                RuntimeFingerprint = inventory.Instance.ConfigurationFingerprint, RuntimeNotice = "已核对所选实例的运行时节点信息。" };
+            var checkedInventory = inventory with { Resources = resources, CoreNodeTypes = inventory.CoreNodeTypes.Concat(builtin).Distinct(StringComparer.Ordinal).ToArray(),
+                RuntimeFingerprint = inventory.Instance.ConfigurationFingerprint, RuntimeNotice = "已核对所选实例的运行时节点信息。",
+                RunningCoreVersion = stats.RootElement.GetProperty("system").TryGetProperty("comfyui_version", out var version) && version.ValueKind == JsonValueKind.String ? version.GetString() : null };
+            try
+            {
+                if (args.Contains("--multi-user") || !DesktopRuntimeEndpointResolver.SamePath(inventory.Instance.WorkflowsDirectory,
+                    Path.Combine(inventory.Instance.UserDirectory, "default", "workflows")))
+                    return checkedInventory with { FrontendNotice = "尚未核对前端列表：当前用户目录未确认。" };
+                using var users = await ReadAsync(endpoint.Port, "users", token);
+                if (users.RootElement.TryGetProperty("users", out _))
+                    return checkedInventory with { FrontendNotice = "尚未核对前端列表：多用户配置需要确认用户。" };
+                using var list = await ReadAsync(endpoint.Port, "userdata?dir=workflows&recurse=true&split=false&full_info=true", token);
+                var paths = FrontendWorkflowList.Parse(list.RootElement);
+                if (await resolver.ResolveAsync(inventory.Instance, peers, token) != endpoint)
+                    return checkedInventory with { FrontendNotice = "尚未核对前端列表：运行实例发生变化。" };
+                return checkedInventory with { FrontendListVerified = true, FrontendWorkflows = paths, FrontendNotice = "已核对所选实例的前端保存列表" };
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or JsonException or InvalidDataException or OperationCanceledException && !token.IsCancellationRequested)
+            { return checkedInventory with { FrontendNotice = "尚未核对前端列表：服务查询失败。" }; }
         }
         catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidDataException or JsonException or InvalidOperationException or KeyNotFoundException or OperationCanceledException && !token.IsCancellationRequested)
         { return inventory with { RuntimeNotice = "运行时节点信息读取失败，保留源码索引：" + ex.Message }; }

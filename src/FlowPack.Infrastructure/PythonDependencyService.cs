@@ -9,24 +9,41 @@ namespace FlowPack.Infrastructure;
 public sealed record PythonWheelFile(string Name, string Version, string Path, string Sha256);
 public sealed record PythonDependencyPlan(string PythonPath, IReadOnlyDictionary<string, string> Baseline, IReadOnlyList<PythonWheelFile> Wheels);
 public sealed record PythonRecoveryIssue(string PlanId, string? PythonPath, string Message);
+public sealed record PythonDependencyInputs(IReadOnlyList<PlannedDeployment> NodeFiles,
+    IReadOnlyList<PlannedDeployment> RequirementFiles, IReadOnlyList<PlannedDeployment> ProjectFiles,
+    IReadOnlyList<string> DeclaredRequirements)
+{
+    // Metadata presence is deliberately conservative: empty files and projects that only
+    // constrain Python still need a qualified Python path before parsing/preparing them.
+    public bool RequiresPythonDependencies => RequirementFiles.Count > 0 || ProjectFiles.Count > 0 || DeclaredRequirements.Count > 0;
+}
 
 /// <summary>Resolves compatible wheels against pinned installed versions; never executes node installation scripts.</summary>
 public sealed class PythonDependencyService(string libraryPath)
 {
+    public static PythonDependencyInputs Inspect(ResourceInstallPlan plan)
+    {
+        var nodeRoot = Path.GetFullPath(plan.Instance.CustomNodesDirectory);
+        var nodes = plan.Files.Where(x => ResourceImportService.Inside(nodeRoot, Path.GetFullPath(x.TargetPath)) ||
+            x.TargetPath.Replace('\\', '/').Contains("/custom_nodes/", StringComparison.OrdinalIgnoreCase)).ToArray();
+        // Use target names, not staging file names: staging may rename a source while the
+        // installed metadata still governs the node's dependency preparation.
+        return new(nodes, nodes.Where(x => Path.GetFileName(x.TargetPath).Equals("requirements.txt", StringComparison.OrdinalIgnoreCase)).ToArray(),
+            nodes.Where(x => Path.GetFileName(x.TargetPath).Equals("pyproject.toml", StringComparison.OrdinalIgnoreCase)).ToArray(), plan.PythonRequirements);
+    }
+
     public async Task<PythonDependencyPlan?> PrepareAsync(ResourceInstallPlan plan, CancellationToken token = default)
     {
-        var requirements = plan.Files.Where(x => x.TargetPath.Replace('\\', '/').Contains("/custom_nodes/", StringComparison.OrdinalIgnoreCase) && Path.GetFileName(x.SourcePath).Equals("requirements.txt", StringComparison.OrdinalIgnoreCase)).ToArray();
-        var nodeFiles = plan.Files.Where(x => x.TargetPath.Replace('\\', '/').Contains("/custom_nodes/", StringComparison.OrdinalIgnoreCase)).ToArray();
-        if (nodeFiles.Length > 0 && plan.Instance.PythonPath is { } targetPython) await EnsureNoPendingRepairAsync(targetPython, token);
-        if (nodeFiles.Any(x => Path.GetFileName(x.SourcePath) is "install.py" or "install.bat" or "install.sh"))
+        var sources = Inspect(plan);
+        if (sources.NodeFiles.Count > 0 && plan.Instance.PythonPath is { } targetPython) await EnsureNoPendingRepairAsync(targetPython, token);
+        if (sources.NodeFiles.Any(x => new[] { "install.py", "install.bat", "install.sh" }.Contains(Path.GetFileName(x.TargetPath), StringComparer.OrdinalIgnoreCase)))
             throw new InvalidDataException("节点包含特殊安装脚本，需要专门适配；不会自动执行脚本。");
-        var projects = nodeFiles.Where(x => Path.GetFileName(x.SourcePath) == "pyproject.toml").ToArray();
-        if (requirements.Length == 0 && projects.Length == 0 && plan.PythonRequirements.Count == 0) return null;
+        if (!sources.RequiresPythonDependencies) return null;
         var python = plan.Instance.PythonPath ?? throw new InvalidDataException("缺少目标 Python。");
         var directory = Path.Combine(libraryPath, "staging", "python", plan.Id); Directory.CreateDirectory(directory);
         var input = new List<string>();
-        foreach (var requirement in plan.PythonRequirements) AddRequirement(requirement);
-        foreach (var projectFile in projects)
+        foreach (var requirement in sources.DeclaredRequirements) AddRequirement(requirement);
+        foreach (var projectFile in sources.ProjectFiles)
         {
             var output = await RunAsync(python, ["-I", "-c", "import tomllib,json,sys; p=tomllib.load(open(sys.argv[1],'rb')).get('project',{}); print(json.dumps({'dependencies':p.get('dependencies',[]),'dynamic':p.get('dynamic',[]),'python':p.get('requires-python')}))", projectFile.SourcePath], token);
             using var project = JsonDocument.Parse(output);
@@ -36,7 +53,7 @@ public sealed class PythonDependencyService(string libraryPath)
             if (project.RootElement.GetProperty("python").ValueKind == JsonValueKind.String)
                 await RunAsync(python, ["-I", "-c", "import sys; from packaging.specifiers import SpecifierSet; assert SpecifierSet(sys.argv[1]).contains('.'.join(map(str,sys.version_info[:3]))), 'Node requires a different Python version'", project.RootElement.GetProperty("python").GetString()!], token);
         }
-        foreach (var file in requirements)
+        foreach (var file in sources.RequirementFiles)
         {
             foreach (var raw in await File.ReadAllLinesAsync(file.SourcePath, token))
             {

@@ -34,6 +34,30 @@ public sealed class PersistentWorkerServiceTests : IDisposable
         if (tampered) Assert.Contains("已保存的预览", result.Error);
     }
     private readonly string _root = Path.Combine(Path.GetTempPath(), "FlowPack-worker-" + Guid.NewGuid().ToString("N"));
+    [Fact]
+    public async Task Import_history_and_stage_progress_survive_worker_restart()
+    {
+        Directory.CreateDirectory(_root);
+        var file = Path.Combine(_root, "workflow.json");
+        await File.WriteAllTextAsync(file, "{\"version\":1,\"nodes\":[]}");
+        string jobId;
+        await using (var worker = new PersistentWorkerService(new ResourceLibraryDatabase(Path.Combine(_root, "library"))))
+        {
+            await worker.InitializeAsync();
+            var request = Request("resource.import", new ImportJobInput(file)); jobId = request.RequestId;
+            Assert.True((await worker.HandleAsync(request, default)).Succeeded);
+            var job = await WaitAsync(worker, jobId);
+            Assert.Equal("Completed", job.State); Assert.Equal(1, job.CompletedUnits); Assert.Equal(1, job.TotalUnits);
+        }
+        await using var restarted = new PersistentWorkerService(new ResourceLibraryDatabase(Path.Combine(_root, "library")));
+        await restarted.InitializeAsync();
+        var response = await restarted.HandleAsync(Request("library.imports", new { }), default);
+        var history = response.Payload!.Value.Deserialize<ImportHistoryEntry[]>()!;
+        Assert.Equal(file, Assert.Single(history).Source); Assert.Equal(1, history[0].ResourceCount);
+        var restored = await WaitAsync(restarted, jobId);
+        Assert.Equal(1, restored.CompletedUnits); Assert.Equal("项", restored.ProgressUnit);
+    }
+
     private static WorkerRequest Request(string command, object input, string? id = null) =>
         new(WorkerProtocol.Version, id ?? Guid.NewGuid().ToString("N"), "fixture", command, JsonSerializer.SerializeToElement(input));
     private static async Task<WorkerJob> WaitAsync(PersistentWorkerService worker, string id)

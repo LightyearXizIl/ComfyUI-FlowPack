@@ -46,7 +46,18 @@ internal static class RecoveryCrashAcceptance
                 if (process.ExitCode == 0) throw new IOException("The child did not end by forced termination.");
                 var partialPath = beforeTermination.Files.Single().TemporaryPath!;
                 var partialBytes = File.Exists(partialPath) ? new FileInfo(partialPath).Length : 0;
-                var partialHash = File.Exists(partialPath) ? await ResourceImportService.HashAsync(partialPath) : null;
+                string? partialHash = null;
+                if (File.Exists(partialPath))
+                {
+                    // Windows can retain the terminated child's file handle briefly. This
+                    // bounded wait only reads the retained probe file; recovery does not start
+                    // until it can be verified, and failures remain failures after the deadline.
+                    for (var attempt = 0; ; attempt++)
+                    {
+                        try { partialHash = await ResourceImportService.HashAsync(partialPath); break; }
+                        catch (IOException) when (attempt < 20) { await Task.Delay(100, deadline.Token); }
+                    }
+                }
                 if (phase == "during-copy" && (partialBytes <= 0 || partialBytes >= 536870912))
                     throw new InvalidDataException("Missed the partial-copy window; this run does not prove interrupted copying.");
                 var report = (await new ResourceInstallationService(root).RecoverAsync()).Single();
@@ -98,7 +109,8 @@ internal static class RecoveryCrashAcceptance
         var id = Guid.NewGuid().ToString("N");
         var temporary = target + ".flowpack-" + id + ".tmp";
         var plan = new ResourceInstallPlan(id, instance,
-            [new(source, target, new FileInfo(source).Length, await ResourceImportService.HashAsync(source), false)], [], new FileInfo(source).Length, DateTimeOffset.UtcNow);
+            [new(source, target, new FileInfo(source).Length, await ResourceImportService.HashAsync(source), false)], [], new FileInfo(source).Length, DateTimeOffset.UtcNow)
+            { RequiresPythonDependencies = false };
         async Task PauseAsync()
         {
             await using (var marker = new FileStream(Path.Combine(root, "ready.json.tmp"), FileMode.CreateNew, FileAccess.Write, FileShare.None))

@@ -6,8 +6,8 @@
  <WrapPanel>
   <TextBlock Text="文件夹直达" Style="{StaticResource SubtleText}" VerticalAlignment="Center" Margin="0,0,16,8"
    Visibility="{Binding ShowLabel,RelativeSource={RelativeSource AncestorType=UserControl},Converter={StaticResource LabelVisibility}}"/>
-  <Button Content="工作流文件夹" Tag="Workflow" Click="OnOpenFolder" Style="{StaticResource FolderShortcutButton}" AutomationProperties.Name="打开工作流文件夹"/>
-  <Button Content="模型文件夹" Tag="Model" Click="OnOpenFolder" Style="{StaticResource FolderShortcutButton}" AutomationProperties.Name="打开模型文件夹"/>
-  <Button Content="节点文件夹" Tag="CustomNode" Click="OnOpenFolder" Style="{StaticResource FolderShortcutButton}" AutomationProperties.Name="打开节点文件夹"/>
+  <Button Content="工作流文件夹" Tag="Workflow" Click="OnOpenFolder" Style="{DynamicResource FolderShortcutButton}" AutomationProperties.Name="打开工作流文件夹"/>
+  <Button Content="模型文件夹" Tag="Model" Click="OnOpenFolder" Style="{DynamicResource FolderShortcutButton}" AutomationProperties.Name="打开模型文件夹"/>
+  <Button Content="节点文件夹" Tag="CustomNode" Click="OnOpenFolder" Style="{DynamicResource FolderShortcutButton}" AutomationProperties.Name="打开节点文件夹"/>
  </WrapPanel>
 </UserControl>

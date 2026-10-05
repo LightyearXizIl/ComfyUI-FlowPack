@@ -59,6 +59,41 @@ public sealed class ShellViewModelTests
     }
 
     [Fact]
+    public void Home_export_and_secondary_routes_share_one_page_and_preserve_resource_context()
+    {
+        var vm = new ShellViewModel();
+        vm.NavigateCommand.Execute("Models"); vm.ResourceFilter = "model";
+        vm.LocalModels.Add(new(new("m", ResourceKind.Model, "model", "fixture.pth", "upscale_models/fixture.pth")) { IsSelected = true });
+        var scope = typeof(ShellViewModel).GetField("_exportKind", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        scope.SetValue(vm, ResourceKind.Model);
+        vm.NavigateCommand.Execute("Packaging");
+        Assert.Equal(FlowPage.Packaging, vm.CurrentPage);
+        Assert.True(vm.IsPackagingContext); Assert.Null(scope.GetValue(vm));
+        vm.ReturnToResourcesCommand.Execute(null);
+        Assert.Equal(1, vm.LibraryTabIndex); Assert.Equal("model", vm.ResourceFilter);
+        vm.NavigateCommand.Execute("PackageWizard"); Assert.Equal(FlowPage.Packaging, vm.CurrentPage);
+        vm.NavigateCommand.Execute("Home"); vm.NavigateCommand.Execute("Library"); Assert.Equal(1, vm.LibraryTabIndex);
+        vm.NavigateCommand.Execute("999"); Assert.Equal(FlowPage.Library, vm.CurrentPage);
+        vm.ClearExportSelectionCommand.Execute(null); vm.BeginExportCommand.Execute(null);
+        Assert.Equal(FlowPage.Library, vm.CurrentPage); Assert.Equal(0, vm.LibraryTabIndex);
+    }
+    [Fact]
+    public void Import_routes_select_their_secondary_page_and_tasks_keep_the_current_page()
+    {
+        var vm = new ShellViewModel();
+        var package = new PackageRow("p", "p", "1", "fixture", "fixture", []);
+        vm.OpenPackageCommand.Execute(package);
+        Assert.Equal(FlowPage.Install, vm.CurrentPage);
+        Assert.Equal(1, vm.InstallTabIndex);
+        vm.NavigateCommand.Execute("Packages");
+        Assert.Null(vm.SelectedPackage);
+        vm.NavigateCommand.Execute("Install");
+        Assert.Equal(0, vm.InstallTabIndex);
+        vm.NavigateCommand.Execute("Tasks");
+        Assert.Equal(FlowPage.Install, vm.CurrentPage);
+    }
+
+    [Fact]
     public void Package_details_follow_the_selected_package()
     {
         var viewModel = new ShellViewModel();
@@ -86,7 +121,7 @@ public sealed class ShellViewModelTests
 
         Assert.Equal("LightyearXizIl", viewModel.AuthorName);
         Assert.Equal("https://github.com/LightyearXizIl/ComfyUI-FlowPack", viewModel.RepositoryUrl);
-        Assert.Equal("0.0.5", viewModel.ApplicationVersion);
+        Assert.Equal("0.0.6", viewModel.ApplicationVersion);
         Assert.True(viewModel.OpenRepositoryCommand.CanExecute(null));
         Assert.True(viewModel.CopyRepositoryUrlCommand.CanExecute(null));
         Assert.True(viewModel.ExportDiagnosticsCommand.CanExecute(null));

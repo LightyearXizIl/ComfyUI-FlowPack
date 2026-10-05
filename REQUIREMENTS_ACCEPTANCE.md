@@ -1,5 +1,7 @@
 # ComfyUI FlowPack 需求与验收追踪表
 
+> 阅读说明（2026-10-05）：本表保留原需求/测试编号和各阶段证据，未在本次文档整理中批量改判。当前改版的已验证范围、默认跳过项、便携交付及未完成事项见 [项目状态](docs/PROJECT_STATUS.md) 与 [资源转移改版记录](docs/RESOURCE_TRANSFER_2026-10-05.md)。下文旧版“当前”数值仅对应当时记录，不代表本次重新验收。
+
 
 2026-09-12 工作流格式说明补充（源码）：ResourceImportService将API与UI格式的识别依据分开，现有“详情与用途”展示API执行图与UI画布数据的区别；对侧栏空白仅提示可尝试文件打开入口或向提供者索取UI格式，不承诺该动作必定成功，不改写或自动转换原JSON。apple-design指导把格式限制靠近资源详情而非新增弹窗。官方格式参考https://docs.comfy.org/development/cloud/overview仅用于API图定义，不作为Desktop侧栏行为证明。新增API/UI两项回归，验证源文件、暂存文件、WorkflowDocument.RawJson及哈希保持一致；完整Release292通过/5专项跳过，artifacts/acceptance/core-completion-audit/workflow-format-evidence.trx，diff通过。本轮是使用说明补充，不是侧栏兼容性修复或实际打开验证；未加入36EA…候选，未执行安装。
 

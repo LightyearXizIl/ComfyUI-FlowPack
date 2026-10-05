@@ -10,6 +10,7 @@
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
+    <Watch Include="**/*.xaml" Exclude="bin/**;obj/**" />
     <ProjectReference Include="..\FlowPack.Core\FlowPack.Core.csproj" />
     <ProjectReference Include="..\FlowPack.Infrastructure\FlowPack.Infrastructure.csproj" />
     <ProjectReference Include="..\FlowPack.ComfyUI\FlowPack.ComfyUI.csproj" />

@@ -21,10 +21,22 @@ public sealed record ImportPlan(string Id, string Source, string StagingRoot, IR
 
 public sealed class ResourceImportService
 {
-    public async Task<ImportPlan> ImportAsync(string source, string stagingRoot, CancellationToken token = default)
+    public async Task<ImportPlan> ImportAsync(string source, string stagingRoot, CancellationToken token = default, IProgress<OperationProgress>? progress = null)
     {
         source = Path.GetFullPath(source);
-        if (File.Exists(source) && source.EndsWith(".cpack.json", StringComparison.OrdinalIgnoreCase))
+        progress?.Report(new("读取导入来源"));
+        var onlineManifest = false;
+        if (File.Exists(source) && source.EndsWith(".json", StringComparison.OrdinalIgnoreCase) && new FileInfo(source).Length <= 16 * 1024 * 1024)
+        {
+            try
+            {
+                using var candidate = JsonDocument.Parse(await File.ReadAllTextAsync(source, token));
+                onlineManifest = candidate.RootElement.ValueKind == JsonValueKind.Object && candidate.RootElement.TryGetProperty("formatVersion", out _) &&
+                    candidate.RootElement.TryGetProperty("resources", out _) && candidate.RootElement.TryGetProperty("id", out _);
+            }
+            catch (JsonException) { }
+        }
+        if (File.Exists(source) && (source.EndsWith(".cpack.json", StringComparison.OrdinalIgnoreCase) || onlineManifest))
         {
             ResourceInstallationService.EnsureNoLinks(source);
             var manifest = (await new PackageImportReader().ReadAsync(source, token)).Manifest;
@@ -39,7 +51,7 @@ public sealed class ResourceImportService
         if (File.Exists(source) && (source.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || source.EndsWith(".cpack", StringComparison.OrdinalIgnoreCase)))
         {
             if (source.EndsWith(".cpack", StringComparison.OrdinalIgnoreCase)) legacy = await new PackageImportReader().ReadAsync(source, token);
-            root = (await new NativePackageStagingService().StageAsync(source, stagingRoot, cancellationToken: token)).RootPath;
+            root = (await new NativePackageStagingService().StageAsync(source, stagingRoot, cancellationToken: token, progress: progress)).RootPath;
         }
         if (Directory.Exists(source) && File.Exists(Path.Combine(source, "manifest.json")))
         {
@@ -53,6 +65,7 @@ public sealed class ResourceImportService
         var files = single ? new[] { root } : ResourceFiles.Enumerate(root).ToArray();
         if (single) root = Path.GetDirectoryName(root)!;
         var entries = new List<ImportResource>();
+        progress?.Report(new("核对导入内容", 0, files.Length));
         var workflows = new List<WorkflowDocument>();
         var issues = new List<string>();
         var manifestPath = Path.Combine(root, "flowpack-manifest.json");
@@ -67,7 +80,7 @@ public sealed class ResourceImportService
                 PlannedZipExportService.ValidateRelative(relative);
                 var file = Path.GetFullPath(Path.Combine(root, relative));
                 if (!Inside(root, file) || !File.Exists(file) || new FileInfo(file).Length != item.GetProperty("size").GetInt64() ||
-                    !string.Equals(await HashAsync(file, token), item.GetProperty("sha256").GetString(), StringComparison.OrdinalIgnoreCase))
+                    !string.Equals(await HashAsync(file, token, progress), item.GetProperty("sha256").GetString(), StringComparison.OrdinalIgnoreCase))
                     throw new InvalidDataException("资源清单校验失败：" + relative);
             }
             if (manifest.RootElement.TryGetProperty("issues", out var missing) && missing.ValueKind == JsonValueKind.Array)
@@ -116,7 +129,7 @@ public sealed class ResourceImportService
                 try
                 {
                     var raw = await File.ReadAllTextAsync(file, token);
-                    var document = WorkflowDocumentFactory.Create(await HashAsync(file, token), Path.GetFileNameWithoutExtension(file), raw);
+                    var document = WorkflowDocumentFactory.Create(await HashAsync(file, token, progress), Path.GetFileNameWithoutExtension(file), raw);
                     if (document.Format != WorkflowFormat.Unknown)
                     {
                         kind = ResourceKind.Workflow; state = RecognitionState.Confirmed;
@@ -176,7 +189,8 @@ public sealed class ResourceImportService
                 }
             }
             entries.Add(new(Guid.NewGuid().ToString("N"), file, relative, kind, target, new FileInfo(file).Length,
-                await HashAsync(file, token), state, evidence));
+                await HashAsync(file, token, progress), state, evidence));
+            progress?.Report(new("核对导入内容", entries.Count, files.Length));
         }
         if (legacy is not null)
             entries = LegacyImportMapping.Apply(legacy.Manifest, entries, issues);
@@ -185,10 +199,19 @@ public sealed class ResourceImportService
         return new(Guid.NewGuid().ToString("N"), source, root, entries, workflows, issues);
     }
 
-    public static async Task<string> HashAsync(string file, CancellationToken token = default)
+    public static async Task<string> HashAsync(string file, CancellationToken token = default, IProgress<OperationProgress>? progress = null)
     {
         await using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read, 131072, true);
-        return Convert.ToHexString(await SHA256.HashDataAsync(stream, token));
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var buffer = new byte[131072]; long completed = 0; int read;
+        var stage = "校验文件 · " + Path.GetFileName(file);
+        progress?.Report(new(stage, 0, stream.Length, "字节"));
+        while ((read = await stream.ReadAsync(buffer, token)) > 0)
+        {
+            hash.AppendData(buffer, 0, read); completed += read;
+            progress?.Report(new(stage, completed, stream.Length, "字节"));
+        }
+        return Convert.ToHexString(hash.GetHashAndReset());
     }
     public static bool Inside(string root, string path) => Path.GetFullPath(path).StartsWith(Path.TrimEndingDirectorySeparator(Path.GetFullPath(root)) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 }

@@ -10,6 +10,8 @@ public sealed record ResourceInstallPlan(string Id, InstanceDescriptor Instance,
     IReadOnlyList<string> BlockingReasons, long RequiredBytes, DateTimeOffset CreatedAt)
 {
     public IReadOnlyList<string> PythonRequirements { get; init; } = [];
+    // Null is a legacy plan, which cannot authorize installation without being rebuilt.
+    public bool? RequiresPythonDependencies { get; init; }
     public DeploymentCapability? Capability { get; init; }
 }
 public sealed record DeploymentJournal(string PlanId, string State, IReadOnlyList<JournalFile> Files, string? Error = null);
@@ -22,7 +24,7 @@ public sealed record JournalFile(string TargetPath, string Sha256, string State)
 /// <summary>Creates and applies immutable file plans. Caller must hold the Worker library lease.</summary>
 public sealed class ResourceInstallationService(string libraryPath)
 {
-    public async Task<ResourceInstallPlan> PlanAsync(InstanceDescriptor instance, IReadOnlyList<ImportResource> resources, CancellationToken token = default)
+    public async Task<ResourceInstallPlan> PlanAsync(InstanceDescriptor instance, IReadOnlyList<ImportResource> resources, CancellationToken token = default, IProgress<OperationProgress>? progress = null)
     {
         var blockers = new List<string>(instance.Issues);
         if (!instance.IsModern) blockers.Add("旧版只支持检测和导出。");
@@ -53,10 +55,10 @@ public sealed class ResourceInstallationService(string libraryPath)
             }
             EnsureNoLinks(target);
             if (!targets.Add(target)) { blockers.Add("重复部署目标：" + resource.TargetRelativePath); continue; }
-            var sourceHash = await ResourceImportService.HashAsync(resource.SourcePath, token);
+            var sourceHash = await ResourceImportService.HashAsync(resource.SourcePath, token, progress);
             if (sourceHash != resource.Sha256) { blockers.Add("导入后源文件发生变化：" + resource.OriginalPath); continue; }
             var exists = File.Exists(target);
-            var reuse = exists && (await ResourceImportService.HashAsync(target, token)).Equals(resource.Sha256, StringComparison.OrdinalIgnoreCase);
+            var reuse = exists && (await ResourceImportService.HashAsync(target, token, progress)).Equals(resource.Sha256, StringComparison.OrdinalIgnoreCase);
             if (exists && !reuse) blockers.Add("同名异内容，不能覆盖：" + resource.TargetRelativePath);
             if (Directory.Exists(target)) blockers.Add("目标被目录占用：" + resource.TargetRelativePath);
             files.Add(new(resource.SourcePath, target, new FileInfo(resource.SourcePath).Length, resource.Sha256, reuse));
@@ -71,13 +73,14 @@ public sealed class ResourceInstallationService(string libraryPath)
                 blockers.Add("已有节点包含计划外源码，不能合并覆盖：" + package.Key);
         }
         CheckSpace(files, blockers);
-        return new(Guid.NewGuid().ToString("N"), instance, files, blockers.Distinct().ToArray(), files.Where(x => !x.Reuse).Sum(x => x.SizeBytes), DateTimeOffset.UtcNow)
+        var plan = new ResourceInstallPlan(Guid.NewGuid().ToString("N"), instance, files, blockers.Distinct().ToArray(), files.Where(x => !x.Reuse).Sum(x => x.SizeBytes), DateTimeOffset.UtcNow)
             { PythonRequirements = resources.SelectMany(x => x.DeclaredPythonDependencies).Distinct().ToArray() };
+        return plan with { RequiresPythonDependencies = PythonDependencyService.Inspect(plan).RequiresPythonDependencies };
     }
 
     public async Task ExecuteAsync(ResourceInstallPlan plan, Func<InstanceDescriptor, CancellationToken, Task<InstanceDescriptor>> refresh,
         IProgress<string>? progress = null, CancellationToken token = default,
-        Func<CancellationToken, Task>? prepareEnvironment = null, Func<CancellationToken, Task>? installEnvironment = null)
+        Func<CancellationToken, Task>? prepareEnvironment = null, Func<CancellationToken, Task>? installEnvironment = null, IProgress<OperationProgress>? resourceProgress = null)
     {
         if (!Guid.TryParseExact(plan.Id, "N", out _)) throw new InvalidDataException("安装计划标识无效。");
         if (plan.BlockingReasons.Count > 0) throw new InvalidDataException(string.Join("\n", plan.BlockingReasons));
@@ -96,6 +99,10 @@ public sealed class ResourceInstallationService(string libraryPath)
                     try { await ReadJournalAsync(journalFile, token); }
                     catch (Exception ex) when (IsRecoveryError(ex))
                     { throw new InvalidDataException("安装恢复日志需要人工修复，尚未写入目标。日志：" + journalFile, ex); }
+            if (plan.RequiresPythonDependencies is null)
+                throw new InvalidDataException("旧安装计划缺少 Python 依赖能力依据，请重新生成安装计划。");
+            if (plan.RequiresPythonDependencies != PythonDependencyService.Inspect(plan).RequiresPythonDependencies)
+                throw new InvalidDataException("安装计划的 Python 依赖依据不一致，请重新生成安装计划。");
             async Task VerifyEnvironmentAsync()
             {
                 var current = await refresh(plan.Instance, token);
@@ -110,13 +117,21 @@ public sealed class ResourceInstallationService(string libraryPath)
                         throw new IOException("已有节点出现计划外源码，请重新检查：" + package);
             }
             await VerifyEnvironmentAsync();
+            // Verify every source before Python reads metadata or pip resolves anything. Per-file
+            // verification below remains necessary because sources can change during deployment.
+            foreach (var source in plan.Files)
+            {
+                EnsureNoLinks(source.SourcePath);
+                if (await ResourceImportService.HashAsync(source.SourcePath, token, resourceProgress) != source.Sha256)
+                    throw new IOException("安装源文件已改变，请重新生成安装计划。");
+            }
             var spaceIssues = new List<string>(); CheckSpace(plan.Files, spaceIssues);
             if (spaceIssues.Count > 0) throw new IOException(string.Join("\n", spaceIssues));
             var journal = new DeploymentJournal(plan.Id, "Running", []);
             await SaveJournalAsync(journal, token);
             try
             {
-                if (prepareEnvironment is not null) await prepareEnvironment(token);
+                if (prepareEnvironment is not null) { resourceProgress?.Report(new("检查 Python 依赖环境")); await prepareEnvironment(token); }
                 await VerifyEnvironmentAsync();
                 foreach (var file in plan.Files)
                 {
@@ -124,11 +139,11 @@ public sealed class ResourceInstallationService(string libraryPath)
                     await VerifyEnvironmentAsync();
                     EnsureNoLinks(file.SourcePath);
                     EnsureNoLinks(file.TargetPath);
-                    if (await ResourceImportService.HashAsync(file.SourcePath, token) != file.Sha256)
+                    if (await ResourceImportService.HashAsync(file.SourcePath, token, resourceProgress) != file.Sha256)
                         throw new IOException("安装源文件已改变。");
                     if (File.Exists(file.TargetPath))
                     {
-                        if (await ResourceImportService.HashAsync(file.TargetPath, token) == file.Sha256) continue;
+                        if (await ResourceImportService.HashAsync(file.TargetPath, token, resourceProgress) == file.Sha256) continue;
                         throw new IOException("目标文件在安装前发生冲突。");
                     }
                     if (file.Reuse) throw new IOException("计划复用的目标文件已被移走，请重新检查。");
@@ -141,8 +156,8 @@ public sealed class ResourceInstallationService(string libraryPath)
                     {
                         await using (var input = File.OpenRead(file.SourcePath))
                         await using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 131072, true))
-                        { await input.CopyToAsync(output, token); await output.FlushAsync(token); output.Flush(flushToDisk: true); }
-                        if (await ResourceImportService.HashAsync(temporary, token) != file.Sha256) throw new IOException("部署文件校验失败。");
+                        { await ProgressIO.CopyAsync(input, output, input.Length, "部署文件 · " + Path.GetFileName(file.TargetPath), resourceProgress, token); await output.FlushAsync(token); output.Flush(flushToDisk: true); }
+                        if (await ResourceImportService.HashAsync(temporary, token, resourceProgress) != file.Sha256) throw new IOException("部署文件校验失败。");
                         await VerifyEnvironmentAsync();
                         EnsureNoLinks(file.TargetPath);
                         File.Move(temporary, file.TargetPath, overwrite: false);
@@ -155,6 +170,7 @@ public sealed class ResourceInstallationService(string libraryPath)
                 {
                     await VerifyEnvironmentAsync();
                     await SaveJournalAsync(journal with { State = "InstallingPython" }, token);
+                    resourceProgress?.Report(new("安装 Python 依赖"));
                     await installEnvironment(token);
                 }
                 await SaveJournalAsync(journal with { State = "FilesDeployed" }, token);

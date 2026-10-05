@@ -1,0 +1,11 @@
+{
+  "manualDependencyCancellationPreserved": true,
+  "target": "flowpack-native-617bf974",
+  "appExe": "<repository>\\artifacts\\release\\0.0.6\\app-check\\App\\ComfyUI.FlowPack.exe",
+  "desktopInferenceVerified": false,
+  "zip": "<repository>\\artifacts\\acceptance\\simplify-20261005\\runtime-617bf9742aed42eeaab7376b15c5ec8a\\portable-ui-runs\\1524fd89c45c425cbd5bb30f466eb3b9\\exported-resources.zip",
+  "testCapabilityInjected": false,
+  "passed": true,
+  "zipSha256": "F185D893C610CF574E24407936069769C2CAAF9D54C8AAF7D68E09B6FACF4CE7",
+  "installed": false
+}

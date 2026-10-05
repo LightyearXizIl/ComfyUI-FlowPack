@@ -23,7 +23,10 @@ public sealed class DeploymentCapabilityProvider(
     Func<string, string?>? readVersion = null) : IDeploymentCapabilityProvider
 {
     // Add only version/layout combinations with recorded Desktop + App + Worker qualification.
-    private readonly IReadOnlyList<DeploymentQualification> _qualifications = qualifications ?? [];
+    private readonly IReadOnlyList<DeploymentQualification> _qualifications = qualifications ?? [
+        new("1.1.4", "standalone-native", true, "desktop-1.1.4-transfer-20261005"),
+        new("1.1.4", "standalone-adopted", true, "desktop-1.1.4-transfer-20261005")
+    ];
 
     public DeploymentCapability Evaluate(InstanceDescriptor instance, bool requiresPython)
     {

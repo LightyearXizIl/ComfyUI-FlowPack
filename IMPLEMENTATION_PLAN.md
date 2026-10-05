@@ -1,5 +1,7 @@
 # ComfyUI FlowPack 完整软件执行规划书
 
+> 阅读说明（2026-10-05）：本文件保留原阶段规划与历史实施过程。当前源码、交付包、已验证范围及后续事项统一见 [项目状态](docs/PROJECT_STATUS.md)，开发命令见 [开发指南](docs/DEVELOPMENT.md)。下文各日期中的“当前”“最新”仅指记录当时，不覆盖最新状态；原阶段与需求编号保留。
+
 
 2026-09-12 跨进程更新协调验收：源码专用Smoke新增--acceptance-update-coordination，在每个独立临时范围启动两个真实PersistentWorkerService子进程/独立资源库。正常完成场景PID37928/12912：两边均拒绝更新期间的新任务，首个任务结束后仍等待第二个，模拟安装期间保持协调锁及安装文件写保护，结束后恢复接收任务。取消场景PID5152/40232：取消更新不取消原任务，两子进程正常完成，接收任务能力恢复。两场景通过；结果及拒绝响应在artifacts/acceptance/update-process-coordination/，更新/协调回归7通过（update-coordination-regression.trx）。安装器启动和App退出握手仍用回调替代，未运行真正安装器，不能视为App界面或旧版本升级验收。默认Smoke输出因既有PID26688锁定而构建失败，未终止该进程；改为独立artifacts/acceptance/hosts/update-coordination-current输出后构建0警告0错误并完成测试。本轮仅新增测试宿主，不改产品业务代码或36EA…安装器；常规完整基线仍290/5，生产资格不变。
 

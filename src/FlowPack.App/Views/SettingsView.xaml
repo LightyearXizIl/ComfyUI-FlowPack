@@ -1,30 +1,97 @@
-<UserControl x:Class="FlowPack.App.Views.SettingsView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
- xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:views="clr-namespace:FlowPack.App.Views" AutomationProperties.AutomationId="Page.Settings">
- <ScrollViewer Style="{StaticResource PageScroll}"><StackPanel>
-  <TextBlock Text="设置" Style="{StaticResource PageTitle}"/>
-  <TextBlock Text="外观和语言即时生效；实例、更新与高级选项按用途分组。" Style="{StaticResource SubtleText}" Margin="0,8,0,24"/>
-  <Border Style="{StaticResource SectionCard}"><StackPanel>
-   <TextBlock Text="界面偏好" Style="{StaticResource SectionTitle}" Margin="0,0,0,16"/>
-   <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="150"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="16"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <StackPanel VerticalAlignment="Center"><TextBlock Text="外观" FontWeight="SemiBold"/><TextBlock Text="跟随系统或手动选择" Style="{StaticResource SubtleText}"/></StackPanel>
-    <ComboBox Grid.Column="1" ItemsSource="{Binding ThemeBaseOptions}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding SelectedThemeBase,Mode=TwoWay}" AutomationProperties.Name="主题基底模式" MaxWidth="360" HorizontalAlignment="Left" MinWidth="240"/>
-    <TextBlock Grid.Row="2" Text="{Binding Text[Settings.Language]}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-    <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding LanguageOptions}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding SelectedLanguage,Mode=TwoWay}" AutomationProperties.Name="{Binding Text[Settings.Language]}" MaxWidth="360" HorizontalAlignment="Left" MinWidth="240"/>
-   </Grid>
-  </StackPanel></Border>
-  <Border Style="{StaticResource SectionCard}"><StackPanel>
-   <TextBlock Text="Desktop 实例" Style="{StaticResource SectionTitle}"/>
-   <TextBlock Text="{Binding SelectedInstance.DisplayName,TargetNullValue=尚未选择实例,FallbackValue=尚未选择实例}" Margin="0,8,0,12" TextWrapping="Wrap"/>
-   <WrapPanel><Button Content="重新检测" Command="{Binding RefreshInstancesCommand}" Margin="0,0,8,8"/><Button Content="手动关联" Command="{Binding AssociateInstanceCommand}" Margin="0,0,0,8"/></WrapPanel>
-   <TextBlock Text="多个实例可在窗口右上方切换；关联不会移动原有资源。" Foreground="{DynamicResource MutedBrush}" TextWrapping="Wrap"/>
-  </StackPanel></Border>
-  <Border Style="{StaticResource SectionCard}"><StackPanel>
-   <TextBlock Text="{Binding Text[Settings.Update]}" Style="{StaticResource SectionTitle}"/>
-   <TextBlock Text="{Binding UpdateNotice}" Margin="0,8,0,12" TextWrapping="Wrap"/>
-   <WrapPanel><Button Content="{Binding Text[Update.Check]}" Command="{Binding CheckForUpdatesCommand}" AutomationProperties.Name="{Binding Text[Update.Check]}" Margin="0,0,8,8"/>
-    <Button Content="下载并安装更新" Command="{Binding InstallUpdateCommand}" IsEnabled="{Binding HasUpdate}" Style="{StaticResource PrimaryButton}" Margin="0,0,0,8"/></WrapPanel>
-  </StackPanel></Border>
-  <Border Style="{StaticResource Card}"><Expander Header="高级设置与自定义外观"><views:AppearanceView Margin="0,16,0,0"/></Expander></Border>
- </StackPanel></ScrollViewer>
+<UserControl x:Class="FlowPack.App.Views.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:FlowPack.App.Views"
+             AutomationProperties.AutomationId="Page.Settings">
+  <UserControl.Resources>
+    <Style x:Key="SettingsHeading" TargetType="TextBlock" BasedOn="{StaticResource SectionTitle}">
+      <Setter Property="FontSize" Value="22"/><Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+    <Style x:Key="SettingsNavItem" TargetType="TabItem">
+      <Setter Property="Foreground" Value="{DynamicResource MutedBrush}"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Padding" Value="14,12"/><Setter Property="Margin" Value="0,0,0,6"/>
+      <Setter Property="MinHeight" Value="44"/>
+      <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="TabItem">
+        <Grid>
+          <Border x:Name="NavSurface" Background="{TemplateBinding Background}" BorderBrush="Transparent" BorderThickness="1" CornerRadius="{DynamicResource ControlCornerRadius}" Padding="{TemplateBinding Padding}">
+            <ContentPresenter x:Name="NavLabel" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+          </Border>
+          <Border x:Name="NavFocus" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2" CornerRadius="{DynamicResource ControlCornerRadius}" IsHitTestVisible="False" Visibility="Collapsed"/>
+        </Grid>
+        <ControlTemplate.Triggers>
+          <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="NavSurface" Property="Background" Value="{DynamicResource AccentSoftBrush}"/></Trigger>
+          <Trigger Property="IsSelected" Value="True">
+            <Setter TargetName="NavSurface" Property="Background" Value="{DynamicResource SelectionBrush}"/>
+            <Setter TargetName="NavSurface" Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource SelectionTextBrush}"/>
+            <Setter TargetName="NavLabel" Property="TextElement.FontWeight" Value="SemiBold"/>
+          </Trigger>
+          <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="NavFocus" Property="Visibility" Value="Visible"/></Trigger>
+        </ControlTemplate.Triggers>
+      </ControlTemplate></Setter.Value></Setter>
+    </Style>
+  </UserControl.Resources>
+  <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <StackPanel Margin="0,0,0,24">
+      <TextBlock Text="设置" Style="{StaticResource PageTitle}"/>
+      <TextBlock Text="管理界面偏好、Desktop 实例、存储位置与日志。" Style="{StaticResource SubtleText}" Margin="0,8,0,0"/>
+    </StackPanel>
+    <TabControl x:Name="SettingsNavigation" Grid.Row="1" TabStripPlacement="Left" SelectedIndex="{Binding SettingsTabIndex,Mode=TwoWay}"
+                ItemContainerStyle="{StaticResource SettingsNavItem}" AutomationProperties.Name="设置导航">
+      <TabControl.Template><ControlTemplate TargetType="TabControl">
+        <Grid>
+          <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+          <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+          <Border Grid.Column="2" Style="{StaticResource Card}" Padding="24">
+            <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent"
+                              HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+          </Border>
+        </Grid>
+      </ControlTemplate></TabControl.Template>
+      <TabItem Header="界面偏好">
+        <ScrollViewer Style="{StaticResource PageScroll}" Foreground="{DynamicResource TextBrush}"><StackPanel AutomationProperties.AutomationId="Settings.Preferences">
+          <TextBlock Text="界面偏好" Style="{StaticResource SettingsHeading}"/>
+          <TextBlock Text="外观和语言即时生效。" Style="{StaticResource SubtleText}" Margin="0,0,0,28"/>
+          <Grid>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="240"/></Grid.ColumnDefinitions>
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="24"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+            <StackPanel VerticalAlignment="Center"><TextBlock Text="外观" FontWeight="SemiBold"/><TextBlock Text="跟随系统，或选择深浅模式" Style="{StaticResource SubtleText}" Margin="0,4,16,0"/></StackPanel>
+            <ComboBox Grid.Column="1" ItemsSource="{Binding ThemeBaseOptions}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                      SelectedValue="{Binding SelectedThemeBase,Mode=TwoWay}" AutomationProperties.Name="主题基底模式" VerticalAlignment="Center"/>
+            <TextBlock Grid.Row="2" Text="{Binding Text[Settings.Language]}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding LanguageOptions}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                      SelectedValue="{Binding SelectedLanguage,Mode=TwoWay}" AutomationProperties.Name="{Binding Text[Settings.Language]}"/>
+          </Grid>
+          <TextBlock Text="{Binding AppearancePreferenceNotice}" Style="{StaticResource SubtleText}" Margin="0,24,0,0"/>
+        </StackPanel></ScrollViewer>
+      </TabItem>
+      <TabItem Header="Desktop 实例">
+        <ScrollViewer Style="{StaticResource PageScroll}" Foreground="{DynamicResource TextBrush}"><StackPanel AutomationProperties.AutomationId="Settings.Instances">
+          <TextBlock Text="Desktop 实例" Style="{StaticResource SettingsHeading}"/>
+          <TextBlock Text="多个实例可在窗口右上方切换；关联不会移动原有资源。" Style="{StaticResource SubtleText}" Margin="0,0,0,28"/>
+          <TextBlock Text="当前实例" Style="{StaticResource SubtleText}"/>
+          <TextBlock Text="{Binding SelectedInstance.DisplayName,TargetNullValue=尚未选择实例,FallbackValue=尚未选择实例}"
+                     FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,6,0,16"/>
+          <WrapPanel><Button Content="重新扫描" Command="{Binding RefreshInstancesCommand}" Margin="0,0,8,0"/>
+            <Button Content="关联目录" Command="{Binding AssociateInstanceCommand}"/></WrapPanel>
+          <Border Height="1" Background="{DynamicResource BorderBrush}" Margin="0,28"/>
+          <Expander Header="安装位置与资源目录"><TextBlock Text="{Binding InstancePaths}" Style="{StaticResource SubtleText}" Margin="0,8,0,0"/></Expander>
+        </StackPanel></ScrollViewer>
+      </TabItem>
+      <TabItem Header="存储位置">
+        <ScrollViewer Style="{StaticResource PageScroll}" Foreground="{DynamicResource TextBrush}"><StackPanel AutomationProperties.AutomationId="Settings.Storage">
+          <TextBlock Text="存储位置" Style="{StaticResource SettingsHeading}"/>
+          <TextBlock Text="保存 FlowPack 的资源记录、任务和恢复信息。" Style="{StaticResource SubtleText}" Margin="0,0,0,28"/>
+          <TextBlock Text="保存位置" FontWeight="SemiBold" Margin="0,0,0,8"/>
+          <Expander Header="查看完整路径"><TextBox Text="{Binding ResourceLibraryLocation,Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" AutomationProperties.Name="FlowPack 数据保存位置" Margin="0,8,0,0"/></Expander>
+          <Button Content="关联目录" Command="{Binding SelectResourceLibraryCommand}" AutomationProperties.Name="关联 FlowPack 数据目录" HorizontalAlignment="Left" Margin="0,16,0,0"/>
+          <Expander Header="存储说明" Margin="0,16,0,0"><TextBlock Text="关联目录会读取该位置的数据，不会自动搬迁旧数据。便携测试版默认保存在包内的 Data/Library。ComfyUI 的模型和节点仍保留在实例目录中。" Style="{StaticResource SubtleText}" Margin="0,8,0,0"/></Expander>
+        </StackPanel></ScrollViewer>
+      </TabItem>
+      <TabItem Header="日志"><views:LoggingView/></TabItem>
+      <TabItem Header="关于作者"><views:AboutAuthorView/></TabItem>
+    </TabControl>
+  </Grid>
 </UserControl>

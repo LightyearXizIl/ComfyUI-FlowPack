@@ -19,6 +19,12 @@ public sealed record ResourceInventory(InstanceDescriptor Instance, IReadOnlyLis
 {
     public string? RuntimeFingerprint { get; init; }
     public string? RuntimeNotice { get; init; }
+    public string? CoreVersion { get; init; }
+    public string? RunningCoreVersion { get; init; }
+    public string? DesktopVersion { get; init; }
+    public bool FrontendListVerified { get; init; }
+    public IReadOnlyList<string> FrontendWorkflows { get; init; } = [];
+    public string FrontendNotice { get; init; } = "尚未核对前端列表";
 }
 
 public static class ResourceFiles
@@ -60,17 +66,20 @@ public static class ResourceFiles
 
 public sealed class ResourceInventoryService
 {
-    public Task<ResourceInventory> ScanAsync(InstanceDescriptor instance, CancellationToken token = default) => Task.Run(() =>
+    public Task<ResourceInventory> ScanAsync(InstanceDescriptor instance, CancellationToken token = default, IProgress<OperationProgress>? progress = null) => Task.Run(() =>
     {
         var resources = new List<LocalResource>();
         var issues = new List<string>(instance.Issues);
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        void Report(string stage) => progress?.Report(new(stage, resources.Count));
+        Report("发现资源目录");
         void ScanModels(string root, string? category)
         {
             foreach (var file in ResourceFiles.Enumerate(root).Where(ResourceFiles.IsModel))
             {
                 token.ThrowIfCancellationRequested();
                 if (!seen.Add(file)) continue;
+                Report("扫描模型目录");
                 var relative = ResourceFiles.Relative(root, file);
                 var parts = relative.Split('/');
                 var kind = category ?? (parts.Length > 1 ? parts[0] : null);
@@ -108,7 +117,8 @@ public sealed class ResourceInventoryService
                 token.ThrowIfCancellationRequested();
                 if (Path.GetFileName(directory).EndsWith(".disabled", StringComparison.OrdinalIgnoreCase) ||
                     (File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0 || !seen.Add(directory)) continue;
-                var types = ReadDeclaredNodeTypes(directory);
+                Report("索引节点包 · " + Path.GetFileName(directory));
+                var types = ReadDeclaredNodeTypes(directory, progress);
                 var identity = ReadPackageIdentity(directory);
                 if (types.Count == 0) issues.Add("节点包需要运行实例信息补充类型：" + Path.GetFileName(directory));
                 resources.Add(new(directory, ResourceKind.CustomNode, Path.GetFileName(directory), directory,
@@ -118,6 +128,14 @@ public sealed class ResourceInventoryService
         foreach (var file in ResourceFiles.Enumerate(instance.WorkflowsDirectory).Where(f => f.EndsWith(".json", StringComparison.OrdinalIgnoreCase)))
         {
             token.ThrowIfCancellationRequested();
+            if (Path.GetFileName(file).StartsWith('.') || new FileInfo(file).Length > 16 * 1024 * 1024) continue;
+            Report("识别工作流");
+            try
+            {
+                using var json = JsonDocument.Parse(File.ReadAllText(file));
+                if (WorkflowReader.DetectFormat(json.RootElement) == WorkflowFormat.Unknown) continue;
+            }
+            catch (JsonException) { issues.Add("工作流 JSON 无法读取：" + ResourceFiles.Relative(instance.WorkflowsDirectory, file)); continue; }
             resources.Add(new(file, ResourceKind.Workflow, Path.GetFileNameWithoutExtension(file), file,
                 "workflows/" + ResourceFiles.Relative(instance.WorkflowsDirectory, file)));
         }
@@ -132,14 +150,16 @@ public sealed class ResourceInventoryService
         if (File.Exists(nodesFile)) core.AddRange(ReadDeclaredNodeTypesFile(nodesFile));
         var extrasRoot = Path.Combine(instance.CoreDirectory, "comfy_extras");
         foreach (var file in ResourceFiles.Enumerate(extrasRoot).Where(f => f.EndsWith(".py"))) core.AddRange(ReadDeclaredNodeTypesFile(file));
-        return new ResourceInventory(instance, resources, core.Distinct(StringComparer.Ordinal).ToArray(), issues);
+        Report("核对实例版本");
+        return new ResourceInventory(instance, resources, core.Distinct(StringComparer.Ordinal).ToArray(), issues)
+        { CoreVersion = InstanceVersionReader.Core(instance.CoreDirectory), DesktopVersion = InstanceVersionReader.Desktop(instance.DesktopExecutable) };
     }, token);
 
-    public static IReadOnlyList<string> ReadDeclaredNodeTypes(string directory) => ResourceFiles.Enumerate(directory)
+    public static IReadOnlyList<string> ReadDeclaredNodeTypes(string directory, IProgress<OperationProgress>? progress = null) => ResourceFiles.Enumerate(directory)
         .Where(p => !ResourceFiles.Relative(directory, p).Split('/').SkipLast(1).Any(part =>
             part.Equals("tests", StringComparison.OrdinalIgnoreCase) || part.Equals("test", StringComparison.OrdinalIgnoreCase) ||
             part.Equals("examples", StringComparison.OrdinalIgnoreCase) || part.Equals("docs", StringComparison.OrdinalIgnoreCase)))
-        .Where(p => p.EndsWith(".py", StringComparison.OrdinalIgnoreCase)).SelectMany(ReadDeclaredNodeTypesFile).Distinct(StringComparer.Ordinal).ToArray();
+        .Where(p => p.EndsWith(".py", StringComparison.OrdinalIgnoreCase)).SelectMany(p => { progress?.Report(new("读取节点声明 · " + Path.GetFileName(p))); return ReadDeclaredNodeTypesFile(p); }).Distinct(StringComparer.Ordinal).ToArray();
     public static (string? Name, string? Version) ReadPackageIdentity(string directory)
     {
         var path = Path.Combine(directory, "pyproject.toml");

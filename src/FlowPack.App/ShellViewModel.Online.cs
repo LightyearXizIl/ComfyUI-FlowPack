@@ -111,7 +111,7 @@ public sealed partial class ShellViewModel
                 var result = await _libraryDatabase.RunAsync<ImportPlan>("resource.materialize", new OnlineMaterializeInput(_activeImport.Id, row.Resource.Id, row.DownloadJobId), JobProgress());
                 await ApplyOnlineResultAsync(result);
             }
-            catch (Exception ex) { row.Status = ex.Message + "；下载任务可在任务面板继续或重试。"; CoreNotice = row.Status; if (single is not null) throw; }
+            catch (Exception ex) { row.Status = ex.Message + "；可在本页选择本地文件，或重新导入后下载。"; CoreNotice = row.Status; if (single is not null) throw; }
         }
     }
 
@@ -176,6 +176,7 @@ public sealed partial class ShellViewModel
     private async Task ApplyOnlineResultAsync(ImportPlan result)
     {
         _activeImport = result; _deployment = null;
+        OnPropertyChanged(nameof(ImportSourceLabel)); OnPropertyChanged(nameof(HasImportSource));
         foreach (var resource in result.Resources)
             if (!ImportResources.Any(x => x.Resource.Id == resource.Id && x.Resource.SourcePath == resource.SourcePath)) ImportResources.Add(new(resource));
         RefreshOnlineRows();
@@ -210,6 +211,7 @@ public sealed partial class ShellViewModel
         if (restored is null) return;
         _importSessionRevision = restored.State.Revision;
         _activeImport = restored.Plan; _deployment = null;
+        OnPropertyChanged(nameof(ImportSourceLabel)); OnPropertyChanged(nameof(HasImportSource));
         RefreshOnlineRows(reset: true);
         foreach (var row in OnlineResources)
             if (restored.State.DownloadJobs.TryGetValue(row.Resource.Id, out var id))

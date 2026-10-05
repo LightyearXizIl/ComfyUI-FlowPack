@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -34,7 +34,7 @@ public sealed record PackageRow(
     string Summary,
     string Status,
     IReadOnlyList<ResourceEntry> Resources,
-    PackageManifest? Manifest = null);
+    PackageManifest? Manifest = null, string? Source = null);
 
 public sealed record TaskRow(string Name, string Stage, int? Progress, string Detail, bool IsCurrent);
 public sealed record WorkflowRow(string Id, string Name, string Format, string Summary);
@@ -55,6 +55,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
     private PackageRow? _selectedPackage;
     private readonly ThemePreferenceStore _themeStore;
     private readonly LibraryBindingStore _libraryBindingStore;
+    private readonly string? _defaultLibraryPath;
     private readonly IInstanceInspector _instanceInspector;
     private WorkerLibraryClient? _libraryDatabase;
     private readonly Func<string, WorkerLibraryClient> _libraryClientFactory;
@@ -90,13 +91,20 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
         IComfyDesktopDetector? desktopDetector = null,
         ILocalizationService? localization = null,
         IUpdateService? updateService = null,
-        Func<string, WorkerLibraryClient>? libraryClientFactory = null)
+        Func<string, WorkerLibraryClient>? libraryClientFactory = null,
+        string? defaultLibraryPath = null,
+        ApplicationLog? applicationLog = null,
+        string? desktopProfile = null)
     {
         _themeStore = themeStore ?? new ThemePreferenceStore();
-        _libraryClientFactory = libraryClientFactory ?? (path => new WorkerLibraryClient(path));
+        var preferenceDirectory = Path.GetDirectoryName(_themeStore.FilePath)!;
+        _applicationLog = applicationLog ?? new ApplicationLog(Path.Combine(preferenceDirectory, "logging.json"), Path.Combine(preferenceDirectory, "Logs"));
+        DesktopProfile = DesktopProfileOptions.NormalizeAndValidate(desktopProfile);
+        _libraryClientFactory = libraryClientFactory ?? (path => new WorkerLibraryClient(path, log: _applicationLog, desktopProfile: DesktopProfile));
         _libraryBindingStore = libraryBindingStore ?? new LibraryBindingStore();
+        _defaultLibraryPath = defaultLibraryPath;
         _instanceInspector = instanceInspector ?? new ComfyUiInspector();
-        _desktopDetector = desktopDetector;
+        _desktopDetector = DesktopProfile is null ? desktopDetector : new DesktopProfileDetector(DesktopProfile);
         _localization = localization ?? new LocalizationService();
         _updateService = updateService ?? new GitHubReleaseUpdateService(new HttpClient());
         _updateNotice = _localization["Update.None"];
@@ -106,30 +114,13 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(PageTitle));
             OnPropertyChanged(nameof(PageSubtitle));
             OnPropertyChanged(nameof(LanguageOptions));
+            OnPropertyChanged(nameof(UpdateActionLabel));
+            OnPropertyChanged(nameof(UpdateActionHint));
         };
         _appliedTheme = LoadInitialTheme();
         _draftTheme = _appliedTheme;
-        NavigateCommand = new RelayCommand(parameter =>
-        {
-            var route = parameter?.ToString();
-            if (Enum.TryParse<FlowPage>(route, out var page))
-            {
-                CurrentPage = page;
-                return;
-            }
-
-            // Legacy links inside existing views resolve into the new six-area shell.
-            if (route is "Workflows" or "Models" or "Nodes")
-                LibraryTabIndex = route == "Models" ? 1 : route == "Nodes" ? 2 : 0;
-            CurrentPage = route switch
-            {
-                "Packages" or "InstallPreview" => FlowPage.Install,
-                "Workflows" or "Models" or "Nodes" => FlowPage.Library,
-                "PackageWizard" => FlowPage.Packaging,
-                "Appearance" => FlowPage.Settings,
-                _ => CurrentPage
-            };
-        });
+        NavigateCommand = new RelayCommand(parameter => NavigateTo(parameter?.ToString()));
+        InitializeLoggingCommands();
         OpenPackageCommand = new RelayCommand(OpenPackage, parameter => parameter is PackageRow);
         ToggleThemeCommand = new RelayCommand(_ => ToggleQuickTheme());
         StartInstallCommand = new RelayCommand(_ => { }, _ => false);
@@ -165,7 +156,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(SelectedLanguage));
             }
         });
-        CheckForUpdatesCommand = new RelayCommand(_ => _ = CheckForUpdatesAsync());
+        CheckForUpdatesCommand = new RelayCommand(_ => _ = CheckForUpdatesAsync(), _ => !_checkingForUpdate && !_updating);
         InstallUpdateCommand = new RelayCommand(_ => _ = InstallUpdateAsync(), _ => HasUpdate);
         InitializeCoreCommands();
 
@@ -193,6 +184,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+    public string? DesktopProfile { get; }
 
     public ICommand NavigateCommand { get; }
     public ICommand OpenPackageCommand { get; }
@@ -291,8 +283,10 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
         get => _currentPage;
         set
         {
+            if (!Enum.IsDefined(value)) return;
             if (_currentPage == value) return;
             _currentPage = value;
+            CloseSecondaryPanel();
             OnPropertyChanged();
             OnPropertyChanged(nameof(PageTitle));
             OnPropertyChanged(nameof(PageSubtitle));
@@ -333,16 +327,23 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
 
     private async Task CheckForUpdatesAsync()
     {
+        if (_checkingForUpdate || _updating) return;
+        _checkingForUpdate = true;
+        _applicationLog.Write(LogSeverity.Information, "update.check.started");
+        _availableUpdate = null;
+        UpdateNotice = Text["Update.Checking"];
+        RefreshUpdateAction();
         try
         {
             var current = typeof(ShellViewModel).Assembly.GetName().Version ?? new Version(0, 0, 0);
             var update = await _updateService.CheckAsync(new Version(current.Major, current.Minor, Math.Max(0, current.Build)), CancellationToken.None);
             _availableUpdate = update;
+            _applicationLog.Write(LogSeverity.Information, update is null ? "update.check.latest" : "update.check.available");
             OnPropertyChanged(nameof(HasUpdate));
             CommandManager.InvalidateRequerySuggested();
             UpdateNotice = update is null
                 ? Text["Update.Latest"]
-                : $"{Text["Update.Available"]} v{update.Version}，点击更新后下载并校验安装器。";
+                : $"{Text["Update.Available"]} v{update.Version}。{Text["Update.InstallHint"]}";
         }
         catch (HttpRequestException)
         {
@@ -358,8 +359,15 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
         }
         catch (InvalidDataException ex)
         {
+            _applicationLog.WriteError("update.check.validation_failed", ex);
             _availableUpdate = null; OnPropertyChanged(nameof(HasUpdate));
             UpdateNotice = "更新校验失败：" + ex.Message;
+        }
+        finally
+        {
+            if (UpdateNotice == Text["Update.Failed"]) _applicationLog.Write(LogSeverity.Error, "update.check.failed");
+            _checkingForUpdate = false;
+            RefreshUpdateAction();
         }
     }
 
@@ -656,6 +664,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
     {
         if (parameter is not PackageRow package) return;
         SelectedPackage = package;
+        InstallTabIndex = 1;
         CurrentPage = FlowPage.Install;
     }
 
@@ -762,7 +771,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
                 var status = stored.Manifest.IsComplete
                     ? "已保存，等待环境检查"
                     : $"已保存但不完整：{stored.Manifest.CompletenessIssues.First()}";
-                Packages.Add(ToPackageRow(stored.Manifest, status));
+                Packages.Add(ToPackageRow(stored.Manifest, status) with { Source = stored.Source });
             }
             await RestoreCandidateInstanceAsync();
             await RestoreWorkflowsAsync();
@@ -812,7 +821,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
     {
         if (_libraryDatabase is null)
         {
-            MessageBox.Show("请先在设置页选择资源库。任务中心只读取资源库中由 Worker 持久化的真实任务。", "需要资源库", MessageBoxButton.OK, MessageBoxImage.Information);
+            NoticeDialog.ShowNotice("请先在设置页选择资源库。任务中心只读取资源库中由 Worker 持久化的真实任务。", "需要资源库");
             CurrentPage = FlowPage.Settings;
             return;
         }
@@ -842,7 +851,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
                     new DownloadTaskPayload(resource.SourceUrl, resource.Sha256, Path.GetFileName(resource.PackagePath ?? resource.Name)), JobProgress());
             }
             await RefreshCoreTasksAsync();
-            CurrentPage = FlowPage.Tasks;
+            CoreNotice = "资源包下载完成。";
         }
         catch (Exception ex) { CoreNotice = "下载失败：" + ex.Message; }
         finally { IsDownloadingPackage = false; }
@@ -1203,7 +1212,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
 
     private async Task ApplyThemeAsync()
     {
-        if (!TryValidateDraft()) return;
+        if (!TryValidateDraft()) { AppearancePreferenceNotice = ThemeNotice; return; }
         try
         {
             await _themeStore.SaveAsync(_draftTheme);
@@ -1215,6 +1224,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
         {
             ThemeNotice = $"无法保存主题：{exception.Message}";
         }
+        AppearancePreferenceNotice = ThemeNotice;
     }
 
     private void CancelTheme()
@@ -1304,11 +1314,11 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
         try
         {
             Process.Start(new ProcessStartInfo(RepositoryUrl) { UseShellExecute = true });
-            ThemeNotice = "已请求在默认浏览器中打开 GitHub 仓库。";
+            RepositoryNotice = "已请求在默认浏览器中打开 GitHub 仓库。";
         }
         catch (Exception exception) when (exception is Win32Exception or InvalidOperationException)
         {
-            ThemeNotice = $"无法打开 GitHub 仓库：{exception.Message}";
+            RepositoryNotice = $"无法打开 GitHub 仓库：{exception.Message}";
         }
     }
 
@@ -1317,11 +1327,11 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
         try
         {
             Clipboard.SetText(RepositoryUrl);
-            ThemeNotice = "GitHub 仓库链接已复制到剪贴板。";
+            RepositoryNotice = "GitHub 仓库链接已复制到剪贴板。";
         }
         catch (Exception exception) when (exception is System.Runtime.InteropServices.COMException or InvalidOperationException)
         {
-            ThemeNotice = $"无法访问剪贴板：{exception.Message}";
+            RepositoryNotice = $"无法访问剪贴板：{exception.Message}";
         }
     }
 
@@ -1347,11 +1357,11 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
             }
             var snapshot = DiagnosticSnapshotExporter.Create(ApplicationVersion, _libraryDatabase is not null, packages.Count, workflows.Count, tasks);
             await DiagnosticSnapshotExporter.ExportAsync(dialog.FileName, snapshot);
-            ThemeNotice = "诊断摘要已导出。内容不包含路径、资源 URL、凭据、工作流原文或错误详情。";
+            DiagnosticsNotice = "诊断摘要已导出。内容不包含路径、资源 URL、凭据、工作流原文或错误详情。";
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            ThemeNotice = $"无法导出诊断摘要：{exception.Message}";
+            DiagnosticsNotice = $"无法导出诊断摘要：{exception.Message}";
         }
     }
 
@@ -1478,7 +1488,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
     {
         if (_libraryDatabase is null)
         {
-            MessageBox.Show("请先在设置页选择资源库。资源包不会只保存在当前会话中。", "需要资源库", MessageBoxButton.OK, MessageBoxImage.Information);
+            NoticeDialog.ShowNotice("请先在设置页选择资源库。资源包不会只保存在当前会话中。", "需要资源库");
             CurrentPage = FlowPage.Settings;
             return;
         }
@@ -1492,11 +1502,11 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
                 await _libraryDatabase.SaveWorkflowAsync(workflow, $"资源包：{imported.Source}");
             }
             await RestorePackagesAsync();
-            CurrentPage = FlowPage.Install;
+            NavigateTo("Packages");
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException)
         {
-            MessageBox.Show(exception.Message, "无法导入资源包", MessageBoxButton.OK, MessageBoxImage.Warning);
+            NoticeDialog.ShowNotice(exception.Message, "无法导入资源包");
         }
     }
 
@@ -1504,7 +1514,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
     {
         if (_libraryDatabase is null)
         {
-            MessageBox.Show("请先在设置页选择资源库。工作流不会只保存在当前会话中。", "需要资源库", MessageBoxButton.OK, MessageBoxImage.Information);
+            NoticeDialog.ShowNotice("请先在设置页选择资源库。工作流不会只保存在当前会话中。", "需要资源库");
             CurrentPage = FlowPage.Settings;
             return;
         }
@@ -1525,7 +1535,7 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
         }
         catch (Exception exception) when (exception is IOException or InvalidDataException or System.Text.Json.JsonException)
         {
-            MessageBox.Show(exception.Message, "无法导入工作流", MessageBoxButton.OK, MessageBoxImage.Warning);
+            NoticeDialog.ShowNotice(exception.Message, "无法导入工作流");
         }
     }
 
@@ -1545,6 +1555,9 @@ public sealed partial class ShellViewModel : INotifyPropertyChanged
         return $"{value:0.##} {units[unit]}";
     }
 
-    private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        if (propertyName is nameof(CoreNotice) or nameof(CoreReady) or nameof(SelectedInstance)) NotifyHomeStatusChanged();
+    }
 }

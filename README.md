@@ -1,42 +1,50 @@
-# ComfyUI FlowPack
+﻿# ComfyUI FlowPack
 
-ComfyUI FlowPack 是面向 Windows x64 与官方 ComfyUI Desktop 的工作流资源管理和打包工具。
+面向 Windows x64 与官方 ComfyUI Desktop 的资源管理和转移工具。查看当前实例的工作流、模型和节点包，分析依赖，按需打包，在目标电脑导入并核对资源。
 
-## 0.0.5
+**当前版本为 `0.0.6`。** 当前交付、测试证据和验证范围见[项目状态](docs/PROJECT_STATUS.md)。
 
-- 首页、我的资源、导入安装三个主要入口；任务与设置作为全局工具，打包工具归入资源库。
-- 工作流、模型、节点文件夹快捷入口，使用所选实例已登记的真实路径，支持多个目录选择。
-- 深浅主题、中文/英文偏好、资源搜索与分类、独立导出预览，以及固定安装目标和摘要的导入布局。
-- 持久 Worker、任务记录和状态动作；工作流、模型、节点资源扫描，原生 ZIP 与旧清单导入导出。
-- 在线依赖来源、经 SHA-256 校验的暂存下载、实际内容复用核对，以及部署计划、恢复和安装后重新检查。
-- GitHub Release 更新检查、下载安装器、校验及独立引导交接。
+## 开始使用
 
-[发布与下载](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases) · [0.0.5 更新说明](release-notes/v0.0.5.md) · [页面规划](docs/UI_LAYOUT_REPLAN_2026-09-30.md)
+从 [GitHub Release](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.6) 下载 `ComfyUI-FlowPack-0.0.6-Setup.exe` 和 `SHA256SUMS.txt`，核对校验后运行安装器。Windows x64 安装器包含 .NET 运行时，安装包未签名。
 
-## 使用范围与限制
+在首页确认实例，扫描后进入“资源库”；勾选资源后进入同一导出清单，或在“导入安装”选择来源并等待自动检查。完整操作说明见[使用指南](docs/USER_GUIDE.md)。
 
-正式 ComfyUI Desktop 自动部署按版本、布局和能力验收控制；目前生产资格表为空，实际环境中受门禁限制的安装保持不可执行。资源检测、整理、导入暂存和导出可继续使用。
+历史便携测试包及临时构建已清理；保留的便携/预览数据位于本机 `artifacts/user-data`，不进入 Git 或安装器。源码开发预览仍可按[开发指南](docs/DEVELOPMENT.md)启动。
 
-完整软件自身升级、数据保留、干净机安装/卸载、系统多 DPI 和实际 Explorer 交互仍待实机验收。安装器未签名。专项测试需要明确提供隔离夹具，常规回归不会自动操作真实 ComfyUI 环境。
+## 主要功能
 
-0.0.4 按原本地安装包补发，未重新构建；当时完整源码快照不可精确回溯，详见 [归档说明](release-notes/v0.0.4.md)。当前完整实现与重绘后的源码保存在 0.0.5。
+| 入口 | 用途 |
+|---|---|
+| 首页 | 选择实例、扫描资源、直达实例文件夹；版本、资源目录与分组状态在居中弹窗查看。 |
+| 资源库 | 按真实目录查看工作流、模型和节点包；搜索名称、类别和路径；查看依赖和被引用关系。 |
+| 导出资源 | 一份最终勾选清单，工作流自动带可确认依赖；取消的依赖保持取消。支持单独及混合导出。 |
+| 导入安装 | 选择 ZIP、工作流、目录及旧格式后自动分析、匹配本地资源并生成安装计划；准备好后点击安装。 |
+| 设置 | 界面偏好、Desktop 实例、存储位置、日志、关于作者与更新。 |
 
-## 构建
+扫描、校验、复制、解压和下载显示阶段进度。已知总量显示当前阶段百分比，未知总量显示活动进度和已处理量。工作流的前端列表核对失败时保留“尚未核对”，不会据此判定已删除。
 
-要求 Windows x64、.NET SDK 10.0.112；生成安装器还需 Inno Setup 6。
+**当前安装范围：** 内置资格覆盖 Desktop `1.1.4`（本机产品版本 `1.1.4.0`）的原生目录与接管已有目录布局，包含文件及 Python 依赖安装；其他版本和未知布局继续阻止安装。实际安装、节点加载和工作流输出证据见 [Desktop 验收记录](docs/DESKTOP_1_1_4_TRANSFER_ACCEPTANCE.md)。
+
+## 本地开发
+
+需要 Windows x64 与 [.NET SDK 配置](global.json) 指定的 `10.0.112`（允许同补丁系列更新）。在源码根目录双击 `实时预览.cmd`，保存源码后会重新编译 App/Worker 并重启 WPF 窗口；双击 `停止实时预览.cmd` 停止预览。便携 ZIP 是固定快照，不会随源码刷新。
+
+仅生成免安装包：
 
 ```powershell
-dotnet restore .\FlowPack.sln --locked-mode
-dotnet test .\FlowPack.sln -c Release --no-restore
-.\build\Build-Release.ps1 -Version 0.0.5
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build\Build-Portable.ps1
 ```
 
-安装器输出到 `artifacts/installer/`。发布脚本运行锁定还原、测试、自包含 App/Worker 发布、安装器编译，并生成三项 SHA-256 清单。标签工作流为常规版本重新构建；带 `.archive.json` 的历史原包版本仅核对归档声明，不替换旧安装包。
+输出到 `artifacts/portable/`，此脚本不运行测试。测试、隔离构建、安装器构建与故障定位见 [开发指南](docs/DEVELOPMENT.md)。
 
-## 文档
+## 项目文档
 
-- `HANDOFF.md`：当前证据、发布状态和待验收事项；
-- `IMPLEMENTATION_PLAN.md`：实施阶段与安全边界；
-- `REQUIREMENTS_ACCEPTANCE.md`：需求和验收追踪；
-- `FRONTEND_REFERENCE.md`：界面视觉与交互基准；
-- `VERSIONING.md`：满 10 进 1 的版本规则。
+- [文档导航](docs/README.md)：按使用、开发、设计、验收和历史记录查找。
+- [使用指南](docs/USER_GUIDE.md)：操作步骤、资源库含义、导入导出、日志和常见问题。
+- [开发指南](docs/DEVELOPMENT.md)：环境、构建、测试、实时预览和打包。
+- [架构说明](docs/ARCHITECTURE.md)：模块边界、数据流、Worker、存储与兼容性。
+- [项目状态](docs/PROJECT_STATUS.md)：当前成果、交付物、证据和未完成事项。
+- [界面规范](DESIGN.md) · [开发交接](HANDOFF.md) · [版本规则](VERSIONING.md)。
+
+[GitHub 项目](https://github.com/LightyearXizIl/ComfyUI-FlowPack) · [发布下载入口](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases) · [第三方说明](THIRD-PARTY-NOTICES.md)

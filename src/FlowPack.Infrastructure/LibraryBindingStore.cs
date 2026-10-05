@@ -5,8 +5,10 @@ namespace FlowPack.Infrastructure;
 /// <summary>Stores only the selected metadata-library location, never ComfyUI paths or credentials.</summary>
 public sealed class LibraryBindingStore
 {
-    public LibraryBindingStore(string? filePath = null)
+    private readonly string? _portableRoot;
+    public LibraryBindingStore(string? filePath = null, string? portableRoot = null)
     {
+        _portableRoot = portableRoot is null ? null : Path.GetFullPath(portableRoot);
         FilePath = filePath ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "ComfyUI FlowPack",
@@ -21,8 +23,8 @@ public sealed class LibraryBindingStore
         if (!File.Exists(FilePath)) return null;
         try
         {
-            return JsonSerializer.Deserialize<LibraryBinding>(File.ReadAllText(FilePath))
-                ?? throw new InvalidDataException("资源库关联文件为空或格式无效。");
+            return Resolve(JsonSerializer.Deserialize<LibraryBinding>(File.ReadAllText(FilePath))
+                ?? throw new InvalidDataException("资源库关联文件为空或格式无效。"));
         }
         catch (JsonException exception)
         {
@@ -34,13 +36,19 @@ public sealed class LibraryBindingStore
     {
         if (!File.Exists(FilePath)) return null;
         await using var stream = File.OpenRead(FilePath);
-        return await JsonSerializer.DeserializeAsync<LibraryBinding>(stream, cancellationToken: cancellationToken)
-            ?? throw new InvalidDataException("资源库关联文件为空或格式无效。");
+        return Resolve(await JsonSerializer.DeserializeAsync<LibraryBinding>(stream, cancellationToken: cancellationToken)
+            ?? throw new InvalidDataException("资源库关联文件为空或格式无效。"));
     }
 
     public async Task SaveAsync(LibraryBinding binding, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(binding);
+        if (_portableRoot is not null)
+        {
+            var relative = Path.GetRelativePath(_portableRoot, Path.GetFullPath(binding.LibraryPath));
+            if (!Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar))
+                binding = binding with { LibraryPath = relative };
+        }
         var directory = Path.GetDirectoryName(Path.GetFullPath(FilePath))!;
         Directory.CreateDirectory(directory);
         var temporaryPath = Path.Combine(directory, $".{Path.GetFileName(FilePath)}.{Guid.NewGuid():N}.tmp");
@@ -57,6 +65,10 @@ public sealed class LibraryBindingStore
             if (File.Exists(temporaryPath)) File.Delete(temporaryPath);
         }
     }
+
+    private LibraryBinding Resolve(LibraryBinding binding) => _portableRoot is null
+        ? binding
+        : binding with { LibraryPath = Path.GetFullPath(binding.LibraryPath, _portableRoot) };
 }
 
 public sealed record LibraryBinding(string LibraryPath, DateTimeOffset BoundAt);

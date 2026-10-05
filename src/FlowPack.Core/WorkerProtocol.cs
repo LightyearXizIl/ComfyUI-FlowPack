@@ -4,7 +4,7 @@ namespace FlowPack.Core;
 
 public static class WorkerProtocol
 {
-    public const string Version = "5";
+    public const string Version = "6";
     public const string PingCommand = "ping";
     public const string StatusCommand = "worker.status";
     public const string ListTasksCommand = "task.list";

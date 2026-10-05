@@ -20,6 +20,9 @@ public sealed class ResourceSelection(LocalResource resource) : INotifyPropertyC
     public string Name => Resource.Name;
     public string Path => Resource.SourcePath;
     public string? Category => Resource.Category;
+    public string KindLabel => Resource.Kind switch { ResourceKind.Workflow => "工作流", ResourceKind.Model => "模型", ResourceKind.CustomNode => "节点包", _ => "其他资源" };
+    private bool _reference;
+    public bool IsReference { get => _reference; set { if (_reference == value) return; _reference = value; PropertyChanged?.Invoke(this, new(nameof(IsReference))); } }
     private bool _selected;
     public bool IsSelected { get => _selected; set { if (_selected == value) return; _selected = value; PropertyChanged?.Invoke(this, new(nameof(IsSelected))); CommandManager.InvalidateRequerySuggested(); } }
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -29,6 +32,7 @@ public sealed class ImportSelection(ImportResource resource) : INotifyPropertyCh
     public ImportResource Resource { get; private set; } = resource;
     private bool _selected = resource.State == RecognitionState.Confirmed;
     public bool IsSelected { get => _selected; set { if (_selected == value) return; _selected = value; PropertyChanged?.Invoke(this, new(nameof(IsSelected))); } }
+    public string GroupName => Resource.Kind switch { ResourceKind.Workflow => "工作流", ResourceKind.Model => "模型", ResourceKind.CustomNode => "节点包 · " + Resource.TargetRelativePath.Replace('\\', '/').Split('/').ElementAtOrDefault(1), _ => "其他资源 · 需要核对用途" };
     public string Name => System.IO.Path.GetFileName(Resource.OriginalPath.Replace('/', System.IO.Path.DirectorySeparatorChar));
     public string OriginalPath => Resource.OriginalPath;
     private string _targetRelativePath = resource.TargetRelativePath;
@@ -94,6 +98,7 @@ public sealed partial class ShellViewModel
     public ObservableCollection<ResourceSelection> LocalWorkflows { get; } = [];
     public ObservableCollection<ResourceSelection> LocalModels { get; } = [];
     public ObservableCollection<ResourceSelection> LocalNodes { get; } = [];
+    public ObservableCollection<ResourceSelection> LocalExportAssets { get; } = [];
     public ICollectionView LocalWorkflowsView => CollectionViewSource.GetDefaultView(LocalWorkflows);
     public ICollectionView LocalModelsView => CollectionViewSource.GetDefaultView(LocalModels);
     public ICollectionView LocalNodesView => CollectionViewSource.GetDefaultView(LocalNodes);
@@ -103,16 +108,25 @@ public sealed partial class ShellViewModel
         get => _resourceFilter;
         set
         {
-            _resourceFilter = value; OnPropertyChanged();
+            _resourceFilter = value; OnPropertyChanged(); ApplyResourceTreeFilter();
             foreach (var view in new[] { LocalWorkflowsView, LocalModelsView, LocalNodesView })
                 view.Filter = item => item is ResourceSelection row && (row.Name.Contains(value, StringComparison.OrdinalIgnoreCase) ||
                     row.Path.Contains(value, StringComparison.OrdinalIgnoreCase) || (row.Category?.Contains(value, StringComparison.OrdinalIgnoreCase) ?? false));
         }
     }
     public ObservableCollection<ImportSelection> ImportResources { get; } = [];
+    public ICollectionView ImportResourcesView
+    {
+        get
+        {
+            var view = CollectionViewSource.GetDefaultView(ImportResources);
+            if (view.GroupDescriptions.Count == 0) view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ImportSelection.GroupName)));
+            return view;
+        }
+    }
     public ObservableCollection<DependencySelection> DependencyRows { get; } = [];
     public ObservableCollection<WorkerJob> CoreTasks { get; } = [];
-    private bool _includeDependencies = true;
+    private bool _includeDependencies;
     public bool IncludeDependencies
     {
         get => _includeDependencies;
@@ -124,16 +138,18 @@ public sealed partial class ShellViewModel
             CommandManager.InvalidateRequerySuggested();
         }
     }
-    public event EventHandler? ExportPreviewRequested;
     public bool AllowPartialExport { get; set; }
     public bool CoreReady => !_coreBusy && !_updating;
     public string DeploymentGateNotice => _deployment?.Capability is not { } capability ? "选择资源后按 Desktop 版本及实例布局检查安装能力。" :
-        capability.Allows(_deployment.PythonRequirements.Count > 0) ? "此计划具备安装能力；安装前请停止所选实例。" : string.Join("\n", capability.Reasons);
+        _deployment.RequiresPythonDependencies is not null && capability.Allows(_deployment.RequiresPythonDependencies == true) ? "此计划具备安装能力；安装前请停止所选实例。" : string.Join("\n", capability.Reasons);
     public string CoreNotice { get => _coreNotice; private set { _coreNotice = value; OnPropertyChanged(); } }
     public string InstancePaths => SelectedInstance is null ? "请选择目标实例。" :
         $"Desktop：{SelectedInstance.DesktopExecutable ?? "程序位置尚未确认"}\n核心：{SelectedInstance.CoreDirectory}\n工作流：{SelectedInstance.WorkflowsDirectory}\n节点：{SelectedInstance.CustomNodesDirectory}\n模型搜索：{string.Join("；", SelectedInstance.ModelRoots.Concat(SelectedInstance.ExtraPaths.Where(x => x.Category != "custom_nodes").Select(x => x.Path)))}\n模型默认写入：{SelectedInstance.ModelsWriteDirectory}\nPython：{SelectedInstance.PythonPath ?? "未找到"}";
     public string ExportSummary => _zipExport is null ? "选择资源后生成导出预览。" :
-        $"将导出 {_zipExport.Files.Count} 个文件，{FormatBytes(_zipExport.TotalBytes)}。\n{string.Join("\n", _zipExport.Issues)}";
+        $"将导出 {_zipExport.Files.Count} 个文件，{FormatBytes(_zipExport.TotalBytes)}。\n" +
+        $"工作流 {_zipExport.Files.Count(x => x.ArchivePath.StartsWith("workflows/", StringComparison.Ordinal))} 个文件 · " +
+        $"模型 {_zipExport.Files.Count(x => x.ArchivePath.StartsWith("models/", StringComparison.Ordinal))} 个文件 · " +
+        $"节点源码 {_zipExport.Files.Count(x => x.ArchivePath.StartsWith("custom_nodes/", StringComparison.Ordinal))} 个文件\n{string.Join("\n", _zipExport.Issues)}";
     public string DeploymentSummary
     {
         get
@@ -153,15 +169,26 @@ public sealed partial class ShellViewModel
         set
         {
             if (_selectedInstance?.Id == value?.Id) return;
-            _selectedInstance = value; _deployment = null; _zipExport = null; _inventory = null;
+            _selectedInstance = value; InvalidateDeployment(); _zipExport = null; _inventory = null;
+            _analyzedExportWorkflows.Clear(); ExportSelectionRows.Clear(); _exportRefreshPending = false;
+            _pendingInstanceScan = value is not null;
+            _homeOperationFailed = false;
+            CoreNotice = value is null ? "等待扫描 Desktop 实例。" : "等待扫描所选实例。";
             DependencyRows.Clear();
+            foreach (var rows in new[] { LocalWorkflows, LocalModels, LocalNodes, LocalExportAssets }) rows.Clear();
+            RebuildResourceTrees();
+            ++_librarySelectionRevision; _librarySelectedResource = null; _librarySelectionCaption = null; LibraryAnalysisBusy = false;
+            LibrarySelectionNotice = "选择资源查看依赖；勾选决定实际导出内容。";
+            LibraryDependencyGroups.Clear(); NotifyLibraryDetails();
             OnPropertyChanged(); OnPropertyChanged(nameof(InstancePaths)); OnPropertyChanged(nameof(DeploymentSummary)); OnPropertyChanged(nameof(DeploymentGateNotice));
+            NotifyTransferState();
             if (!_settingInstance && value is not null) _ = ExecuteCoreAsync(ScanSelectedInstanceAsync);
         }
     }
     public ICommand RefreshInstancesCommand { get; private set; } = null!;
     public ICommand AssociateInstanceCommand { get; private set; } = null!;
     public ICommand ImportNativeCommand { get; private set; } = null!;
+    public ICommand ImportNativeFolderCommand { get; private set; } = null!;
     public ICommand PreviewZipCommand { get; private set; } = null!;
     public ICommand SaveZipCommand { get; private set; } = null!;
     public ICommand PreviewDeploymentCommand { get; private set; } = null!;
@@ -179,6 +206,7 @@ public sealed partial class ShellViewModel
     private void InitializeCoreCommands()
     {
         InitializeOnlineCommands();
+        InitializeTransferCommands();
         ICommand Command(Func<Task> action, Func<bool>? available = null) => new RelayCommand(_ => _ = ExecuteCoreAsync(action), _ => CoreReady && (available?.Invoke() ?? true));
         RefreshInstancesCommand = Command(RefreshInstancesAsync);
         AssociateInstanceCommand = Command(async () =>
@@ -204,6 +232,11 @@ public sealed partial class ShellViewModel
             var dialog = new OpenFileDialog { Filter = "工作流和资源包|*.zip;*.json;*.cpack|所有文件|*.*" };
             if (dialog.ShowDialog() == true) await ImportNativeAsync(dialog.FileName);
         });
+        ImportNativeFolderCommand = Command(async () =>
+        {
+            var dialog = new OpenFolderDialog { Title = "选择工作流或资源目录" };
+            if (dialog.ShowDialog() == true) await ImportNativeAsync(dialog.FolderName);
+        });
         PreviewZipCommand = new RelayCommand(p => _ = ExecuteCoreAsync(async () =>
         {
             if (p is string name) _exportKind = Enum.TryParse<ResourceKind>(name, out var kind) ? kind : null;
@@ -211,15 +244,15 @@ public sealed partial class ShellViewModel
         }), p => CoreReady && HasExportSelection(p));
         SaveZipCommand = Command(async () =>
         {
-            if (_zipExport is null) throw new InvalidDataException("请先生成导出预览。");
+            if (_zipExport is null) await PrepareZipAsync();
+            _ = _zipExport ?? throw new InvalidDataException("选择已改变，正在重新检查，请稍后导出。");
             var dialog = new SaveFileDialog { Filter = "ZIP 资源包|*.zip", DefaultExt = ".zip", FileName = "ComfyUI-resources.zip" };
             if (dialog.ShowDialog() != true) return;
-            await _libraryDatabase!.RunAsync<string>("export.execute", new ExportJobInput(_zipExport, dialog.FileName, AllowPartialExport), JobProgress());
-            CoreNotice = "ZIP 已导出：" + dialog.FileName;
-        }, () => _zipExport is { Files.Count: > 0 });
+            await WriteExportZipAsync(dialog.FileName);
+        }, () => _zipExport is { Files.Count: > 0 } && _exportState != TransferState.Checking);
         PreviewDeploymentCommand = Command(PrepareDeploymentAsync);
         ExecuteDeploymentCommand = new RelayCommand(_ => _ = ExecuteCoreAsync(ExecuteDeploymentAsync),
-            _ => CoreReady && _deployment is { BlockingReasons.Count: 0, Capability: { } capability } && capability.Allows(_deployment.PythonRequirements.Count > 0));
+            _ => CoreReady && _deployment is { BlockingReasons.Count: 0, RequiresPythonDependencies: not null, Capability: { } capability } && capability.Allows(_deployment.RequiresPythonDependencies == true));
         ConfirmMappingCommand = new RelayCommand(p => _ = ExecuteCoreAsync(async () =>
         {
             if (p is ImportSelection row && SelectedInstance is not null) row.Confirm(SelectedInstance);
@@ -245,8 +278,11 @@ public sealed partial class ShellViewModel
     {
         _deploymentInputRevision++;
         _deployment = null;
+        if (_importState is not TransferState.Checking and not TransferState.Executing)
+            _importState = HasImportSource ? TransferState.NeedsAttention : TransferState.Empty;
         OnPropertyChanged(nameof(DeploymentGateNotice));
         OnPropertyChanged(nameof(DeploymentSummary)); OnPropertyChanged(nameof(DeploymentFiles));
+        NotifyTransferState();
         CommandManager.InvalidateRequerySuggested();
     }
     private long _deploymentInputRevision;
@@ -268,7 +304,7 @@ public sealed partial class ShellViewModel
     public async Task InitializeWorkspaceAsync()
     {
         if (_initializedCore) return; _initializedCore = true;
-        await ExecuteCoreAsync(async () => { await EnsureCoreLibraryAsync(); await RefreshInstancesAsync(); await RefreshCoreTasksAsync(); await RestoreImportSessionAsync(); });
+        await ExecuteCoreAsync(async () => { await EnsureCoreLibraryAsync(); await RefreshInstancesAsync(); await RefreshCoreTasksAsync(); await RestoreImportSessionAsync(); await RefreshImportHistoryAsync(); });
         if (!_taskMonitorLifetime.IsCancellationRequested) _ = MonitorCoreTasksAsync();
         await CheckForUpdatesAutomaticallyAsync();
     }
@@ -281,7 +317,7 @@ public sealed partial class ShellViewModel
         }
         var binding = await _libraryBindingStore.LoadAsync();
         if (binding is not null && !Directory.Exists(binding.LibraryPath)) throw new IOException("原资源库不可用，请在设置中重新关联；不会建立空库替代。");
-        var path = binding?.LibraryPath ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ComfyUI FlowPack", "Data");
+        var path = binding?.LibraryPath ?? _defaultLibraryPath ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ComfyUI FlowPack", "Data");
         var database = _libraryClientFactory(path); await database.InitializeAsync();
         _libraryDatabase = database; ResourceLibraryLocation = path;
         if (binding is null) await _libraryBindingStore.SaveAsync(new(path, DateTimeOffset.UtcNow));
@@ -290,7 +326,7 @@ public sealed partial class ShellViewModel
     {
         await EnsureCoreLibraryAsync();
         var instances = (await _libraryDatabase!.RunAsync<IReadOnlyList<InstanceDescriptor>>("instance.discover", new { }, JobProgress())).ToList();
-        foreach (var path in await LoadManualAssociationsAsync())
+        foreach (var path in DesktopProfile is null ? await LoadManualAssociationsAsync() : [])
         {
             if (!Directory.Exists(path) || instances.Any(x => string.Equals(x.InstallRoot, path, StringComparison.OrdinalIgnoreCase))) continue;
             try
@@ -315,6 +351,7 @@ public sealed partial class ShellViewModel
     }
     private async Task ScanSelectedInstanceAsync()
     {
+        _pendingInstanceScan = false;
         if (SelectedInstance is not { } instance) return;
         await EnsureCoreLibraryAsync();
         var inventory = await _libraryDatabase!.RunAsync<ResourceInventory>("inventory.scan", instance, JobProgress());
@@ -322,13 +359,15 @@ public sealed partial class ShellViewModel
         _inventory = inventory;
         _detectedDesktop = instance.ToLegacyLocation();
         ComfyUiLocation = instance.DataDirectory; StatusNotice = "●  已检测 " + instance.Name;
-        var previouslySelected = LocalWorkflows.Concat(LocalModels).Concat(LocalNodes).Where(x => x.IsSelected).Select(x => x.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var collection in new[] { LocalWorkflows, LocalModels, LocalNodes }) collection.Clear();
+        var previousReferences = LocalWorkflows.Where(x => x.IsReference).Select(x => x.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var previouslySelected = SelectedExportResources.Select(x => x.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var collection in new[] { LocalWorkflows, LocalModels, LocalNodes, LocalExportAssets }) collection.Clear();
+        var visibleResourceCount = 0;
         foreach (var resource in _inventory.Resources)
         {
-            if (resource.Kind == ResourceKind.Asset) continue;
-            var collection = resource.Kind switch { ResourceKind.Workflow => LocalWorkflows, ResourceKind.Model => LocalModels, _ => LocalNodes };
-            collection.Add(new(resource) { IsSelected = previouslySelected.Contains(resource.SourcePath) });
+            if (++visibleResourceCount % 100 == 0) await Task.Yield();
+            var collection = resource.Kind switch { ResourceKind.Workflow => LocalWorkflows, ResourceKind.Model => LocalModels, ResourceKind.Asset => LocalExportAssets, _ => LocalNodes };
+            collection.Add(new(resource) { IsSelected = previouslySelected.Contains(resource.SourcePath), IsReference = previousReferences.Contains(resource.SourcePath) });
         }
         foreach (var stored in await _libraryDatabase.LoadWorkflowsAsync())
             if (File.Exists(stored.Source) && !LocalWorkflows.Any(x => x.Path == stored.Source))
@@ -343,18 +382,23 @@ public sealed partial class ShellViewModel
         await SaveWorkspacePreferenceAsync(instance.Id);
         await RefreshImportedDependenciesForInstanceAsync();
         if (!ReferenceEquals(instance, SelectedInstance)) { await ScanSelectedInstanceAsync(); return; }
-        CoreNotice = $"已扫描 {LocalWorkflows.Count} 个工作流、{LocalModels.Count} 个模型、{LocalNodes.Count} 个节点包。" +
+        _lastHomeScanNotice = $"已扫描 {LocalWorkflows.Count} 个工作流、{LocalModels.Count} 个模型、{LocalNodes.Count} 个节点包。" +
             (inventory.Issues.Count > 0 ? "\n" + string.Join("\n", inventory.Issues.Take(8)) : "");
+        CoreNotice = _lastHomeScanNotice;
         OnPropertyChanged(nameof(DetectedDesktop)); OnPropertyChanged(nameof(DesktopSummary)); OnPropertyChanged(nameof(InstancePaths));
+        RebuildResourceTrees();
     }
     private async Task ImportNativeAsync(string path)
     {
+        CurrentPage = FlowPage.Install; SetImportState(TransferState.Checking);
+        _activeImport = null; ImportResources.Clear(); DependencyRows.Clear(); OnlineResources.Clear(); InvalidateDeployment();
         await EnsureCoreLibraryAsync();
         _activeImport = await _libraryDatabase!.RunAsync<ImportPlan>("resource.import", new ImportJobInput(path), JobProgress());
         RefreshOnlineRows(reset: true);
+        OnPropertyChanged(nameof(ImportSourceLabel)); OnPropertyChanged(nameof(HasImportSource));
         ImportResources.Clear(); foreach (var item in _activeImport.Resources) ImportResources.Add(new(item));
-        await SaveImportSessionAsync();
-        _deployment = null; CurrentPage = FlowPage.Install;
+        await SaveImportSessionAsync(); await RefreshImportHistoryAsync();
+        _deployment = null; InstallTabIndex = 0; CurrentPage = FlowPage.Install;
         // Reuse is independent of whether the manifest provides a downloadable URL.
         foreach (var row in OnlineResources.ToArray()) await TryReuseOnlineLocalAsync(row);
         _analyzedWorkflows.Clear(); _analyzedWorkflows.AddRange(_activeImport.Workflows);
@@ -364,6 +408,7 @@ public sealed partial class ShellViewModel
         if (SelectedInstance is not null && ImportResources.Any(x => x.IsSelected)) await PrepareDeploymentAsync();
         // Planning rebuilds dependency rows. Resolve sources on the final rows shown to the user.
         if (DependencyRows.Any(x => x.Dependency.State == DependencyState.Missing)) await ResolveSourcesAsync();
+        SetImportState(HasImportProblems ? TransferState.NeedsAttention : TransferState.Ready);
     }
     private async Task<DependencyAnalysis> PopulateDependenciesAsync(bool includeImported = true)
     {
@@ -402,40 +447,47 @@ public sealed partial class ShellViewModel
     }
     private async Task PrepareZipAsync()
     {
+        var revision = _exportInputRevision;
+        var instance = SelectedInstance;
+        SetExportState(TransferState.Checking, "正在检查导出文件与大小…");
         if (!HasExportSelection(null)) throw new InvalidDataException("请先勾选要导出的资源。");
         await EnsureCoreLibraryAsync();
         if (_inventory is null) throw new InvalidDataException("请先选择并扫描 Desktop 实例。");
-        var selection = LocalWorkflows.Concat(LocalModels).Concat(LocalNodes).Where(x => x.IsSelected && (_exportKind is null || x.Resource.Kind == _exportKind)).Select(x => x.Resource).ToList();
-        _analyzedWorkflows.Clear();
-        foreach (var workflow in selection.Where(x => x.Kind == ResourceKind.Workflow))
-            _analyzedWorkflows.Add(await new WorkflowReader().ReadAsync(workflow.SourcePath));
-        var analysis = await PopulateDependenciesAsync(includeImported: false);
-        var issues = new List<string>();
-        if (IncludeDependencies && _analyzedWorkflows.Count > 0)
+        var selection = SelectedExportResources.Where(x => _exportKind is null || x.Resource.Kind == _exportKind).Select(x => x.Resource).ToList();
+        var references = LocalWorkflows.Where(x => x.IsSelected && IncludedInExport(ResourceKind.Workflow) && (_exportKind is null || _exportKind == ResourceKind.Workflow)).ToArray();
+        var workflows = await Task.Run(async () =>
         {
-            selection.AddRange(analysis.Dependencies.Where(x => x.State == DependencyState.Present ||
-                x.Kind == ResourceKind.CustomNode && x.State == DependencyState.Unresolved && x.Candidates.Count == 1).SelectMany(x => x.Candidates));
-            issues.AddRange(analysis.Issues);
-            issues.AddRange(analysis.Dependencies.Where(x => x.State != DependencyState.Present).Select(x => x.Reference + "：" + x.State));
-        }
-        _zipExport = await _libraryDatabase!.RunAsync<ExportPlan>("export.plan", new ExportPlanningInput(selection, issues), JobProgress());
+            var docs = new List<WorkflowDocument>();
+            foreach (var row in references) docs.Add(await new WorkflowReader().ReadAsync(row.Path));
+            return docs;
+        });
+        var analysis = workflows.Count == 0 ? new DependencyAnalysis([], []) : await _libraryDatabase!.RunAsync<DependencyAnalysis>("dependency.analyze",
+            new DependencyAnalysisInput(workflows, _inventory, []), JobProgress());
+        var payload = ExportSelectionPolicy.Build(selection, analysis,
+            Enum.GetValues<ResourceKind>().Where(IncludedInExport).ToHashSet(), false);
+        selection = payload.Resources.ToList();
+        var plan = await _libraryDatabase!.RunAsync<ExportPlan>("export.plan", new ExportPlanningInput(selection, payload.Issues), JobProgress());
+        if (revision != _exportInputRevision || !ReferenceEquals(instance, SelectedInstance)) { _exportRefreshPending = true; return; }
+        _zipExport = plan;
         var workflowIds = selection.Where(x => x.Kind == ResourceKind.Workflow).Select(x => x.Id).Distinct().ToArray();
         _packageDraft = _packageDraft with { WorkflowId = workflowIds.FirstOrDefault(), WorkflowSelectionJson = JsonSerializer.Serialize(workflowIds) };
         await _libraryDatabase.SaveDraftAsync(_packageDraft);
         CoreNotice = "导出预览已生成。";
         OnPropertyChanged(nameof(ExportSummary)); OnPropertyChanged(nameof(ExportFiles));
-        ExportPreviewRequested?.Invoke(this, EventArgs.Empty);
+        SyncExportRows();
+        SetExportState(plan.Issues.Count > 0 ? TransferState.NeedsAttention : TransferState.Ready, plan.Issues.Count > 0 ? "导出清单有提示，请展开详情。" : "清单已准备好，可调整勾选后导出。");
     }
     private bool HasExportSelection(object? parameter)
     {
         var kind = parameter is string name ? Enum.TryParse<ResourceKind>(name, out var parsed) ? parsed : (ResourceKind?)null : _exportKind;
-        return LocalWorkflows.Concat(LocalModels).Concat(LocalNodes).Any(x => x.IsSelected && (kind is null || x.Resource.Kind == kind));
+        return SelectedExportResources.Any(x => (kind is null || x.Resource.Kind == kind) && IncludedInExport(x.Resource.Kind));
     }
     private async Task ExecuteDeploymentAsync()
     {
         var plan = _deployment ?? throw new InvalidDataException("请先生成安装预览。");
         var instance = SelectedInstance;
         var importId = _activeImport?.Id;
+        SetImportState(TransferState.Executing);
         await _libraryDatabase!.RunAsync<string>("install.execute", plan, JobProgress());
         // A finished install must not leave its old writable preview or staged dependency labels active.
         if (!ReferenceEquals(instance, SelectedInstance) || importId != _activeImport?.Id) return;
@@ -444,17 +496,20 @@ public sealed partial class ShellViewModel
         {
             await ScanSelectedInstanceAsync();
             CoreNotice = "文件已部署，已重新检查本地资源；节点加载状态以目标 Desktop 实际运行结果为准。";
+            SetImportState(TransferState.Completed);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or OperationCanceledException)
         {
             InvalidateDeployment();
             DependencyRows.Clear();
             CoreNotice = "文件已部署，但重新检查失败，请重新扫描实例：" + ex.Message;
+            SetImportState(TransferState.Completed, CoreNotice);
         }
     }
 
     private async Task PrepareDeploymentAsync()
     {
+        SetImportState(TransferState.Checking);
         if (SelectedInstance is null) throw new InvalidDataException("请选择目标实例。");
         await EnsureCoreLibraryAsync();
         var resources = ImportResources.Where(x => x.IsSelected).Select(x => x.Resource with { TargetRelativePath = x.TargetRelativePath }).ToArray();
@@ -471,7 +526,8 @@ public sealed partial class ShellViewModel
         if (!IsCurrent()) { DependencyRows.Clear(); return; }
         _deployment = planned;
         OnPropertyChanged(nameof(DeploymentGateNotice));
-        OnPropertyChanged(nameof(DeploymentSummary)); OnPropertyChanged(nameof(DeploymentFiles)); CoreNotice = DeploymentSummary;
+        OnPropertyChanged(nameof(DeploymentSummary)); OnPropertyChanged(nameof(DeploymentFiles));
+        SetImportState(planned.BlockingReasons.Count > 0 ? TransferState.NeedsAttention : TransferState.Ready);
     }
     private async Task ResolveSourcesAsync()
     {
@@ -511,7 +567,7 @@ public sealed partial class ShellViewModel
             }
             await AppendDependencyAsync(row, downloaded.StagingPath);
         }
-        await PrepareDeploymentAsync(); CurrentPage = FlowPage.Install;
+        await PrepareDeploymentAsync(); NavigateTo("Install");
         CoreNotice = "缺失资源已下载并加入安装预览，已有资源不会重复下载。";
     }
     private async Task ChooseLocalDependencyAsync(DependencySelection? row)
@@ -566,12 +622,14 @@ public sealed partial class ShellViewModel
     {
         if (job is null || _libraryDatabase is null) return;
         try { await _libraryDatabase.CallAsync<WorkerJob>(operation, job.Id); await RefreshCoreTasksAsync(); }
-        catch (Exception ex) { CoreNotice = ex.Message; }
+        catch (Exception ex) { _applicationLog.WriteError("core.operation.failed", ex); CoreNotice = ex.Message; }
     }
     private IProgress<WorkerJob> JobProgress() => new Progress<WorkerJob>(job =>
     {
         _taskSnapshotGeneration++;
+        _homeOperation = job.Operation;
         CoreNotice = job.Operation + "：" + job.Stage;
+        SetOperationProgress(job);
         var existing = CoreTasks.FirstOrDefault(x => x.Id == job.Id);
         if (existing is null) CoreTasks.Insert(0, job);
         else CoreTasks[CoreTasks.IndexOf(existing)] = job;
@@ -616,18 +674,30 @@ public sealed partial class ShellViewModel
     private async Task ExecuteCoreAsync(Func<Task> action)
     {
         if (_coreBusy) return;
+        _homeOperation = null; _homeOperationFailed = false;
+        BeginOperationProgress();
         _coreBusy = true; OnPropertyChanged(nameof(CoreReady)); CommandManager.InvalidateRequerySuggested();
         try
         {
             await action();
+            if (_pendingInstanceScan && SelectedInstance is not null) await ScanSelectedInstanceAsync();
             while (_importChoicesDirty && _activeImport is not null && _libraryDatabase is not null)
             {
                 await SaveImportSessionAsync();
                 if (SelectedInstance is not null) await PrepareDeploymentAsync();
             }
+            while (_exportRefreshPending && CurrentPage == FlowPage.Packaging)
+            {
+                _exportRefreshPending = false;
+                if (SelectedExportResources.Count > 0) await PrepareZipAsync();
+                else SetExportState(TransferState.Empty, "请返回资源库选择资源。");
+            }
         }
-        catch (Exception ex) { CoreNotice = ex.Message; }
-        finally { _coreBusy = false; OnPropertyChanged(nameof(CoreReady)); CommandManager.InvalidateRequerySuggested(); }
+        catch (Exception ex) { FailOperationProgress(ex.Message); _homeOperationFailed = true; _applicationLog.WriteError("core.operation.failed", ex); CoreNotice = ex.Message;
+            if (_exportState is TransferState.Checking or TransferState.Executing) { _exportRefreshPending = false; _zipExport = null; OnPropertyChanged(nameof(ExportFiles)); SetExportState(TransferState.Failed, "导出未完成：" + ex.Message); }
+            if (_importState is TransferState.Checking or TransferState.Executing) { InvalidateDeployment(); SetImportState(TransferState.Failed, ex.Message); }
+        }
+        finally { EndOperationProgress(); _coreBusy = false; OnPropertyChanged(nameof(CoreReady)); CommandManager.InvalidateRequerySuggested(); }
     }
     private string WorkspacePreferencePath => Path.Combine(Path.GetDirectoryName(_themeStore.FilePath)!, "workspace-selection.json");
     private string ManualAssociationsPath => Path.Combine(Path.GetDirectoryName(_themeStore.FilePath)!, "manual-associations.json");

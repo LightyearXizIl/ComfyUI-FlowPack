@@ -8,6 +8,9 @@ namespace FlowPack.Infrastructure;
 public sealed record WorkerJob(string Id, string Operation, JsonElement Input, string State, string Stage,
     JsonElement? Result, string? Error, int Attempt, DateTimeOffset CreatedAt)
 {
+    public long? CompletedUnits { get; init; }
+    public long? TotalUnits { get; init; }
+    public string? ProgressUnit { get; init; }
     public long? CompletedBytes { get; init; }
     public long? TotalBytes { get; init; }
     public OnlineDownloadInput? OnlineOrigin { get; init; }
@@ -22,6 +25,7 @@ public sealed record WorkerJob(string Id, string Operation, JsonElement Input, s
     public bool CanControl(string command) => AvailableActions.Contains(command);
 }
 public sealed record ImportJobInput(string Source);
+public sealed record ImportHistoryEntry(string Source, DateTimeOffset CreatedAt, int ResourceCount);
 public sealed record OnlineMaterializeInput(string PlanId, string ResourceId, string DownloadJobId);
 public sealed record OnlineLocalInput(string PlanId, string ResourceId, string SourcePath);
 public sealed record ExportJobInput(ExportPlan Plan, string Output, bool AllowPartial);
@@ -35,6 +39,7 @@ public sealed class PersistentWorkerService : IAsyncDisposable
 {
     private readonly ResourceLibraryDatabase _database;
     private readonly Func<CancellationToken, Task<IReadOnlyList<InstanceDescriptor>>> _discover;
+    private readonly Func<string, CancellationToken, Task<InstanceDescriptor>> _associate;
     private readonly ConcurrentDictionary<string, WorkerJob> _jobs = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _tokens = new();
     private readonly ConcurrentDictionary<string, Task> _runners = new();
@@ -46,9 +51,11 @@ public sealed class PersistentWorkerService : IAsyncDisposable
     public bool ShutdownRequested { get; private set; }
 
     public PersistentWorkerService(ResourceLibraryDatabase database,
-        Func<CancellationToken, Task<IReadOnlyList<InstanceDescriptor>>>? discover = null, IDeploymentCapabilityProvider? capabilities = null, GlobalWorkCoordinator? coordinator = null)
+        Func<CancellationToken, Task<IReadOnlyList<InstanceDescriptor>>>? discover = null, IDeploymentCapabilityProvider? capabilities = null, GlobalWorkCoordinator? coordinator = null,
+        Func<string, CancellationToken, Task<InstanceDescriptor>>? associate = null)
     {
         _database = database; _discover = discover ?? (ct => new DesktopInstanceDiscovery().DiscoverAsync(ct));
+        _associate = associate ?? ((path, ct) => new DesktopInstanceDiscovery().AssociateAsync(path, ct));
         _capabilities = capabilities ?? new DeploymentCapabilityProvider();
         _coordinator = coordinator ?? new GlobalWorkCoordinator();
     }
@@ -117,7 +124,7 @@ public sealed class PersistentWorkerService : IAsyncDisposable
     {
         try
         {
-            var readOnly = request.Command is "worker.prepare-update" or "job.list" or "job.get" or "library.packages" or "library.workflows" or "library.instances" or "library.drafts" or "library.tasks" ||
+            var readOnly = request.Command is "worker.prepare-update" or "job.list" or "job.get" or "library.imports" or "library.packages" or "library.workflows" or "library.instances" or "library.drafts" or "library.tasks" ||
                 request.Command == WorkerProtocol.PingCommand || request.Command == WorkerProtocol.StatusCommand || request.Command == WorkerProtocol.ListTasksCommand;
             using var admission = readOnly ? null : request.Command is "task.pause" or "task.cancel"
                 ? await _coordinator.EnterTaskControlAsync(token) : await _coordinator.EnterWorkAsync(token);
@@ -316,7 +323,7 @@ public sealed class PersistentWorkerService : IAsyncDisposable
             await _control.WaitAsync();
             try
             {
-                var latest = _jobs[job.Id]; job = job with { CompletedBytes = latest.CompletedBytes, TotalBytes = latest.TotalBytes };
+                var latest = _jobs[job.Id]; job = job with { CompletedBytes = latest.CompletedBytes, TotalBytes = latest.TotalBytes, CompletedUnits = latest.CompletedUnits, TotalUnits = latest.TotalUnits, ProgressUnit = latest.ProgressUnit };
                 _jobs[job.Id] = job; await SaveAsync(job);
             }
             finally { _tokens.TryRemove(job.Id, out _); cancellation.Dispose(); _control.Release(); }
@@ -325,17 +332,28 @@ public sealed class PersistentWorkerService : IAsyncDisposable
 
     private async Task<object?> ExecuteAsync(WorkerJob job, CancellationToken token)
     {
+        var lastOperationProgress = DateTimeOffset.MinValue;
+        var operationProgress = new InlineProgress<OperationProgress>(value =>
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (_jobs.TryGetValue(job.Id, out var prior) && prior.State == "Running")
+            {
+                if (now - lastOperationProgress < TimeSpan.FromMilliseconds(150) && prior.Stage == value.Stage && value.Completed != value.Total) return;
+                lastOperationProgress = now;
+                _jobs.TryUpdate(job.Id, prior with { Stage = value.Stage, CompletedUnits = value.Completed, TotalUnits = value.Total, ProgressUnit = value.Unit }, prior);
+            }
+        });
         switch (job.Operation)
         {
             case "instance.discover": return await _discover(token);
-            case "instance.associate": return await new DesktopInstanceDiscovery().AssociateAsync(job.Input.GetString()!, token);
-            case "inventory.scan": return await ScanRuntimeInventoryAsync(Read<InstanceDescriptor>(job.Input), token);
+            case "instance.associate": return await _associate(job.Input.GetString()!, token);
+            case "inventory.scan": return await ScanRuntimeInventoryAsync(Read<InstanceDescriptor>(job.Input), token, operationProgress);
             case "dependency.analyze":
                 var analysisInput = Read<DependencyAnalysisInput>(job.Input);
                 return await new InventoryDependencyAnalyzer().AnalyzeAsync(analysisInput.Workflows,
                     await ImportInventoryService.MergeVerifiedAsync(await ScanRuntimeInventoryAsync(analysisInput.Inventory.Instance, token), analysisInput.StagedResources ?? [], token), token);
             case "resource.import":
-                var imported = await new ResourceImportService().ImportAsync(Read<ImportJobInput>(job.Input).Source, Path.Combine(_database.LibraryPath, "staging", "imports"), token);
+                var imported = await new ResourceImportService().ImportAsync(Read<ImportJobInput>(job.Input).Source, Path.Combine(_database.LibraryPath, "staging", "imports"), token, operationProgress);
                 await SaveImportedWorkflowsAsync(imported, token);
                 return imported;
             case "resource.materialize":
@@ -377,17 +395,17 @@ public sealed class PersistentWorkerService : IAsyncDisposable
                 return await OnlineLocalHashMatcher.MatchAsync(declaration, matching.CandidatePaths, token, hashProgress);
             case "export.plan":
                 var selection = Read<ExportPlanningInput>(job.Input);
-                return await new PlannedZipExportService().PlanAsync(selection.Resources, selection.Issues, token);
+                return await new PlannedZipExportService().PlanAsync(selection.Resources, selection.Issues, token, operationProgress);
             case "export.execute":
                 var export = Read<ExportJobInput>(job.Input);
                 if (!_jobs.Values.Any(x => x.Operation == "export.plan" && x.State == "Completed" &&
                     x.Result?.Deserialize<ExportPlan>()?.Id == export.Plan.Id &&
                     JsonElement.DeepEquals(x.Result.Value, JsonSerializer.SerializeToElement(export.Plan))))
                     throw new InvalidDataException("导出计划不是本 Worker 已保存的预览，请重新检查导出内容。");
-                await new PlannedZipExportService().ExportAsync(export.Plan, export.Output, export.AllowPartial, token); return export.Output;
+                await new PlannedZipExportService().ExportAsync(export.Plan, export.Output, export.AllowPartial, token, operationProgress); return export.Output;
             case "install.plan":
                 var input = Read<InstallPlanningInput>(job.Input);
-                var proposed = await new ResourceInstallationService(_database.LibraryPath).PlanAsync(input.Instance, input.Resources, token);
+                var proposed = await new ResourceInstallationService(_database.LibraryPath).PlanAsync(input.Instance, input.Resources, token, operationProgress);
                 if (input.Workflows is { Count: > 0 })
                 {
                     var inventory = await ImportInventoryService.MergeVerifiedAsync(await ScanRuntimeInventoryAsync(input.Instance, token), input.Resources, token);
@@ -395,21 +413,24 @@ public sealed class PersistentWorkerService : IAsyncDisposable
                     proposed = proposed with { BlockingReasons = proposed.BlockingReasons.Concat(dependencies.Dependencies.Where(x => x.State != DependencyState.Present)
                           .Select(x => "工作流依赖尚未解决：" + x.Reference + "（" + x.State + "）")).Concat(dependencies.Issues).ToArray() };
                 }
-                return proposed with { Capability = _capabilities.Evaluate(proposed.Instance, proposed.PythonRequirements.Count > 0) };
+                return proposed with { Capability = _capabilities.Evaluate(proposed.Instance, proposed.RequiresPythonDependencies is true) };
             case "install.execute":
                 var install = Read<ResourceInstallPlan>(job.Input);
                 if (install.Capability is null) throw new InvalidDataException("旧计划缺少版本及布局安装能力依据，请重新检查；隔离实例验收资格不会从旧任务继承。");
+                if (install.RequiresPythonDependencies is null) throw new InvalidDataException("旧计划缺少 Python 依赖能力依据，请重新生成安装计划。");
                 // Execute only a plan previously generated and retained by this Worker.
                 if (!_jobs.Values.Any(x => x.Operation == "install.plan" && x.State == "Completed" && x.Result?.Deserialize<ResourceInstallPlan>()?.Id == install.Id && JsonElement.DeepEquals(x.Result.Value, job.Input)))
                     throw new InvalidDataException("安装计划不是本 Worker 生成的原始计划。");
+                if (install.RequiresPythonDependencies != PythonDependencyService.Inspect(install).RequiresPythonDependencies)
+                    throw new InvalidDataException("安装计划的 Python 依赖依据不一致，请重新生成安装计划。");
                 var pythonService = new PythonDependencyService(_database.LibraryPath);
                 PythonDependencyPlan? pythonPlan = null;
                 var executionInstance = (await _discover(token)).SingleOrDefault(x => x.Id == install.Instance.Id) ?? throw new InvalidDataException("目标实例不再存在。");
-                RequireCapability(executionInstance, install.PythonRequirements.Count > 0);
+                RequireCapability(executionInstance, install.RequiresPythonDependencies is true);
                 await new ResourceInstallationService(_database.LibraryPath).ExecuteAsync(install, async (prior, ct) =>
                 {
                     var current = (await _discover(ct)).SingleOrDefault(x => x.Id == prior.Id) ?? throw new InvalidDataException("目标实例不再存在。");
-                    RequireCapability(current, install.PythonRequirements.Count > 0);
+                    RequireCapability(current, install.RequiresPythonDependencies is true);
                     return current;
                 },
                     progress: new InlineProgress<string>(stage =>
@@ -417,7 +438,7 @@ public sealed class PersistentWorkerService : IAsyncDisposable
                         if (_jobs.TryGetValue(job.Id, out var prior)) _jobs.TryUpdate(job.Id, prior with { Stage = stage }, prior);
                     }), token: token,
                     prepareEnvironment: async ct => { pythonPlan = await pythonService.PrepareAsync(install, ct); },
-                    installEnvironment: async ct => { if (pythonPlan is not null) await pythonService.InstallAsync(install.Id, pythonPlan, ct); });
+                    installEnvironment: async ct => { if (pythonPlan is not null) await pythonService.InstallAsync(install.Id, pythonPlan, ct); }, resourceProgress: operationProgress);
                 return install.Id;
             case "task.download":
                 var download = Read<DownloadTaskPayload>(job.Input);
@@ -513,12 +534,13 @@ public sealed class PersistentWorkerService : IAsyncDisposable
         }
     }
 
-    private async Task<ResourceInventory> ScanRuntimeInventoryAsync(InstanceDescriptor instance, CancellationToken token)
+    private async Task<ResourceInventory> ScanRuntimeInventoryAsync(InstanceDescriptor instance, CancellationToken token, IProgress<OperationProgress>? progress = null)
     {
         var peers = await _discover(token);
         var current = peers.SingleOrDefault(x => x.Id == instance.Id) ?? instance;
-        var inventory = await new ResourceInventoryService().ScanAsync(current, token);
+        var inventory = await new ResourceInventoryService().ScanAsync(current, token, progress);
         using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(8) };
+        progress?.Report(new("核对运行实例及前端工作流列表"));
         return await new RuntimeNodeInspector(http, new DesktopRuntimeEndpointResolver(current.ConfigurationRoot)).InspectAsync(inventory, peers, token);
     }
 
@@ -531,6 +553,9 @@ public sealed class PersistentWorkerService : IAsyncDisposable
     private async Task<object?> LibraryAsync(string command, JsonElement? payload, CancellationToken token)
     {
         if (command == "library.initialize") { await _database.InitializeAsync(token); return true; }
+        if (command == "library.imports") return _jobs.Values.Where(x => x.Operation == "resource.import" && x.State == "Completed")
+            .OrderByDescending(x => x.CreatedAt).Select(x => new ImportHistoryEntry(x.Input.Deserialize<ImportJobInput>()!.Source, x.CreatedAt,
+                x.Result?.Deserialize<ImportPlan>()?.Resources.Count ?? 0)).DistinctBy(x => x.Source, StringComparer.OrdinalIgnoreCase).ToArray();
         if (command == "library.packages") return await _database.LoadImportedPackagesAsync(token);
         if (command == "library.workflows") return await _database.LoadWorkflowsAsync(token);
         if (command == "library.instances") return await _database.LoadCandidateInstancesAsync(token);

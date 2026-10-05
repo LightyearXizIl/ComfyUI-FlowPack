@@ -1,7 +1,12 @@
-# Build outputs
+﻿# Build outputs
 **/bin/
 **/obj/
+artifacts/release/
+artifacts/build/
+artifacts/user-data/
 artifacts/publish/
+artifacts/portable/
+artifacts/live-preview/
 artifacts/installer/
 artifacts/install-test/
 artifacts/acceptance/

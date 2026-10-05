@@ -1,0 +1,50 @@
+<UserControl x:Class="FlowPack.App.Views.ResourceBrowserView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:FlowPack.App" AutomationProperties.AutomationId="ResourceBrowser">
+ <UserControl.Resources><BooleanToVisibilityConverter x:Key="Visible"/>
+  <HierarchicalDataTemplate DataType="{x:Type local:ResourceTreeNode}" ItemsSource="{Binding Children}">
+   <StackPanel Orientation="Horizontal" Margin="0,4">
+    <CheckBox IsChecked="{Binding Selection.IsSelected,Mode=TwoWay}" Visibility="{Binding IsResource,Converter={StaticResource Visible}}" AutomationProperties.Name="{Binding Name}" Margin="0,0,8,0"/>
+    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" MaxWidth="420" ToolTip="{Binding Path}" VerticalAlignment="Center"/>
+   </StackPanel>
+  </HierarchicalDataTemplate>
+ </UserControl.Resources>
+ <Grid><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="20"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+   <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{DynamicResource ControlCornerRadius}" Background="{DynamicResource SurfaceBrush}">
+    <Grid><TreeView ItemsSource="{Binding TreeItems,RelativeSource={RelativeSource AncestorType=UserControl}}" SelectedItemChanged="OnResourceSelected"
+      BorderThickness="0" Background="Transparent" Foreground="{DynamicResource TextBrush}" Padding="8" ScrollViewer.CanContentScroll="True"
+      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" AutomationProperties.Name="实例资源目录树"/>
+     <TextBlock Text="没有匹配资源。请清空搜索，或在首页扫描实例。" TextWrapping="Wrap" Margin="24" IsHitTestVisible="False" VerticalAlignment="Center">
+      <TextBlock.Style><Style TargetType="TextBlock" BasedOn="{StaticResource SubtleText}"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding HasTreeItems,RelativeSource={RelativeSource AncestorType=UserControl}}" Value="False"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+     </TextBlock>
+    </Grid>
+   </Border>
+   <ScrollViewer Grid.Column="2" Style="{StaticResource PageScroll}"><StackPanel>
+    <TextBlock Text="{Binding LibrarySelectionTitle}" Style="{StaticResource SectionTitle}"/>
+    <ProgressBar IsIndeterminate="True" Height="3" Margin="0,8,0,0" Visibility="{Binding LibraryAnalysisBusy,Converter={StaticResource Visible}}"/>
+    <TextBlock Text="{Binding LibrarySelectionNotice}" Style="{StaticResource SubtleText}" Margin="0,8,0,12"/>
+    <Expander Header="实际位置"><TextBlock Text="{Binding LibrarySelectionPath}" TextWrapping="Wrap" Margin="0,8"/></Expander>
+    <ItemsControl ItemsSource="{Binding LibraryDependencyGroups}"><ItemsControl.ItemTemplate><DataTemplate>
+     <StackPanel Margin="0,16,0,0"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+      <ItemsControl ItemsSource="{Binding Rows}"><ItemsControl.ItemTemplate><DataTemplate>
+       <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,10"><StackPanel>
+        <DockPanel><CheckBox DockPanel.Dock="Left" IsChecked="{Binding Selection.IsSelected,Mode=TwoWay}" AutomationProperties.Name="{Binding Name}" Margin="0,0,8,0"><CheckBox.Style><Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}"><Style.Triggers><DataTrigger Binding="{Binding Selection}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></CheckBox.Style></CheckBox>
+         <TextBlock Text="{Binding Name}" TextWrapping="Wrap" FontWeight="SemiBold"/></DockPanel>
+        <TextBlock Text="{Binding State}" Style="{StaticResource SubtleText}" Margin="0,4,0,0"/>
+        <TextBlock Text="{Binding RequiredBy}" Style="{StaticResource SubtleText}" Margin="0,4,0,0"/>
+        <TextBlock Text="{Binding Path}" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource MutedBrush}" Margin="0,4,0,0"/>
+       </StackPanel></Border>
+      </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+     </StackPanel>
+    </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+   </StackPanel></ScrollViewer>
+  </Grid>
+  <StackPanel Grid.Row="1" Margin="0,12,0,0" Visibility="{Binding ShowDiskSection,RelativeSource={RelativeSource AncestorType=UserControl},Converter={StaticResource Visible}}">
+   <TextBlock Text="{Binding FrontendListNotice}" Style="{StaticResource SubtleText}"/>
+   <Expander Header="仅在磁盘发现的工作流" Visibility="{Binding HasDiskOnlyWorkflows,Converter={StaticResource Visible}}">
+    <ListBox ItemsSource="{Binding DiskOnlyWorkflows}" MaxHeight="120" SelectedValuePath="Resource" SelectionChanged="OnDiskWorkflowSelected" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextBrush}"><ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="Foreground" Value="{DynamicResource TextBrush}"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/></Style></ListBox.ItemContainerStyle><ListBox.ItemTemplate><DataTemplate>
+     <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected,Mode=TwoWay}" AutomationProperties.Name="{Binding Name}" ToolTip="{Binding Path}"/>
+    </DataTemplate></ListBox.ItemTemplate></ListBox>
+   </Expander>
+  </StackPanel>
+ </Grid>
+</UserControl>
