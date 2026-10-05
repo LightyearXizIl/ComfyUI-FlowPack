@@ -3,12 +3,12 @@
   "removedOriginalBytes": 57365889271,
   "preservedDataBytes": 38079637,
   "outsideWorkspaceCleanup": "Automatic approval review rejected removal of system temporary and dedicated external acceptance directories: blocked by policy. These directories remain.",
-  "workAreaTestPackagesRemaining": 0,
+  "historicalPortablePackagesRemaining": 0,
   "remainingBuildCaches": [
     "src/*/bin",
     "src/*/obj",
     "artifacts/release/0.0.6",
     "artifacts/publish"
   ],
-  "cleanupRestriction": "Automatic approval review also rejected removal of source build caches and the new App verification folder. These outputs and preserved data remain; historical portable packages are deleted."
+  "cleanupRestriction": "Automatic approval review also rejected removal of source build caches, the new App verification folder, and the explicitly bounded temporary release download files. These outputs and preserved data remain; historical portable packages are deleted."
 }

@@ -4,9 +4,9 @@
 
 **2026-10-05**：导入安装页及展开后的按钮共用首页和弹窗的白底黑字圆角样式，资源输入、折叠区、目标选择和状态沿用共享主题。首页保持原排版，详情继续居中。资源库、自动依赖导出、自动导入计划、Python 能力判定、日志与更新改进一并进入本版本。
 
-本地正式安装器已生成，标准 Release **367 通过、0 失败、5 按需专项跳过**。正式 App/Worker 的真实页面导出、取消依赖保持、自动导入与本地复用预览通过，进程正常退出。本轮未重新运行 Desktop 推理；此前 Desktop 1.1.4 两布局安装及真实输出资格证据已提取到[资格记录](docs/release-evidence/0.0.6/deployment-qualification.json)。新版本通过标签工作流发布，远端结果补录到同目录 `release.json`。
+**[v0.0.6 已正式发布](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.6)**，标签固定在 `14db5008e13389eada2196e08f1f5b08fe015a47`，远端 [Release 工作流](https://github.com/LightyearXizIl/ComfyUI-FlowPack/actions/runs/37331770027)与本地标准 Release 均为 **367 通过、0 失败、5 按需专项跳过**。正式 App/Worker 的真实页面导出、取消依赖保持、自动导入与本地复用预览通过，进程正常退出。本轮未重新运行 Desktop 推理；此前 Desktop 1.1.4 两布局安装及真实输出资格证据已提取到[资格记录](docs/release-evidence/0.0.6/deployment-qualification.json)。资产与下载核验见 [release.json](docs/release-evidence/0.0.6/release.json)。
 
-本机 `artifacts/installer` 为正式安装器及校验文件。旧便携包、历史构建、隔离环境和旧本地安装包副本已清理，原便携/预览数据保留在 `artifacts/user-data`。工作区外临时测试目录和本轮部分构建缓存的删除被自动审批拒绝，这部分仍有残留。历史文档中的 `artifacts/acceptance` 与旧便携包路径只用于追溯，原产物现已清理；当前精简证据在[发布证据](docs/release-evidence/0.0.6/README.md)。
+本机 `artifacts/installer` 为下载并核验的正式安装器及校验文件。安装器 **74907419 字节**，SHA-256 `4FFC2991B5FE767BEEFF4B05FD8FA15F21F2D482676980004B1AB0F97800D2CB`，与远端资产及校验清单一致。旧便携包、历史构建、隔离环境和旧本地安装包副本已清理，原便携/预览数据保留在 `artifacts/user-data`。工作区外临时测试目录、本轮部分构建缓存及下载临时文件的删除被自动审批拒绝，这部分仍有残留。历史文档中的 `artifacts/acceptance` 与旧便携包路径只用于追溯，原产物现已清理；当前精简证据在[发布证据](docs/release-evidence/0.0.6/README.md)。
 
 ## 前轮交接 · R7 弹窗风格统一
 

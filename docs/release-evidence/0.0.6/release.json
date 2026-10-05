@@ -1,0 +1,51 @@
+{
+  "version": "0.0.6",
+  "tag": "v0.0.6",
+  "tagCommit": "14db5008e13389eada2196e08f1f5b08fe015a47",
+  "releaseUrl": "https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.6",
+  "publishedAtUtc": "2026-10-05T15:22:28Z",
+  "draft": false,
+  "prerelease": false,
+  "confirmedLatest": true,
+  "ci": {
+    "runId": 37331770027,
+    "url": "https://github.com/LightyearXizIl/ComfyUI-FlowPack/actions/runs/37331770027",
+    "conclusion": "success",
+    "passed": 367,
+    "failed": 0,
+    "skipped": 5,
+    "total": 372,
+    "previousFailedRunId": 37330826682,
+    "previousFailure": "The UI test opened a resource menu before modal focus restoration completed. The test now waits for ApplicationIdle; assertions and product behavior remain unchanged. No Release was published from that run."
+  },
+  "assets": [
+    {
+      "name": "ComfyUI-FlowPack-0.0.6-Setup.exe",
+      "bytes": 74907419,
+      "githubSha256": "4FFC2991B5FE767BEEFF4B05FD8FA15F21F2D482676980004B1AB0F97800D2CB",
+      "checksumFileSha256": "4FFC2991B5FE767BEEFF4B05FD8FA15F21F2D482676980004B1AB0F97800D2CB",
+      "downloadVerification": "passed",
+      "downloadedSha256": "4FFC2991B5FE767BEEFF4B05FD8FA15F21F2D482676980004B1AB0F97800D2CB",
+      "downloadedBytes": 74907419,
+      "fileVersion": "0.0.6",
+      "downloadMethod": "Eight byte ranges fetched from the official GitHub asset API, assembled in order, then verified as one complete file."
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "bytes": 290,
+      "githubSha256": "B0ED94D46E32D1B3E9776CBB443AD631950929FF4BCB9A4A94FDC527A5CB93AB",
+      "downloadVerification": "passed",
+      "downloadedSha256": "B0ED94D46E32D1B3E9776CBB443AD631950929FF4BCB9A4A94FDC527A5CB93AB",
+      "downloadedBytes": 290
+    }
+  ],
+  "validationBoundaries": {
+    "localReleaseTestsPassed": true,
+    "actualAppExportAndAutomaticImportPreviewPassed": true,
+    "appWorkerSourceUnchangedBetweenLocalValidationAndReleaseTag": true,
+    "desktopInstallAndInferenceEvidence": "Qualified R3 records for Desktop 1.1.4 native and adopted layouts, retained in deployment-qualification.json. Installation and inference were not repeated in this release round.",
+    "installerSigned": false,
+    "installedUpgradeAndCleanMachineInstallUninstall": "Not verified in this release round."
+  },
+  "verifiedAtUtc": "2026-10-05T15:38:28.0289199Z"
+}
