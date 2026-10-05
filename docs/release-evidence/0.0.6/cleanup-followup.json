@@ -1,0 +1,101 @@
+{
+  "externalAcceptanceTargets": [
+    {
+      "path": "<acceptance-data>\\adopted-4cc5e414",
+      "bytes": 5160322109
+    },
+    {
+      "path": "<acceptance-data>\\simplify-617bf974",
+      "bytes": 0
+    }
+  ],
+  "remainingDirectories": 634,
+  "verifiedAtUtc": "2026-10-05T15:45:28.5121338Z",
+  "status": "blocked_by_automatic_approval",
+  "remainingOriginalBytes": 8641422958,
+  "projectTargets": [
+    {
+      "path": "<repository>\\artifacts\\publish",
+      "bytes": 234933129
+    },
+    {
+      "path": "<repository>\\artifacts\\release",
+      "bytes": 402568369
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.App\\bin",
+      "bytes": 224278548
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.App\\obj",
+      "bytes": 11720651
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.ComfyUI\\bin",
+      "bytes": 671196
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.ComfyUI\\obj",
+      "bytes": 835941
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.Core\\bin",
+      "bytes": 155718
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.Core\\obj",
+      "bytes": 310872
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.Infrastructure\\bin",
+      "bytes": 1875126
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.Infrastructure\\obj",
+      "bytes": 1766946
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.Smoke\\bin",
+      "bytes": 73580534
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.Smoke\\obj",
+      "bytes": 802291
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.Tests\\bin",
+      "bytes": 85637788
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.Tests\\obj",
+      "bytes": 2503347
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.Worker\\bin",
+      "bytes": 155142717
+    },
+    {
+      "path": "<repository>\\src\\FlowPack.Worker\\obj",
+      "bytes": 945731
+    }
+  ],
+  "additionalRemovedBytes": 0,
+  "userReauthorizedDeletion": true,
+  "preserved": [
+    "Source and project documentation",
+    "artifacts/installer: verified v0.0.6 installer and SHA256SUMS.txt",
+    "artifacts/user-data: saved portable/preview data",
+    "Installed application and running Worker"
+  ],
+  "systemTemporaryTestFixtures": {
+    "count": 616,
+    "names": "flowpack-(desktop|local|adapter|crash)-[0-9a-f]{32}",
+    "allDirectChildrenOfSystemTemp": true
+  },
+  "reason": "blocked by policy",
+  "additionalRemovedDirectories": 0,
+  "attempts": [
+    "Bounded generated artifacts, source build caches, two dedicated acceptance directories, and GUID-named test fixtures: rejected before execution.",
+    "Safer reduced scope of two literal project build-output directories: rejected before execution."
+  ]
+}

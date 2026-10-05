@@ -10,5 +10,10 @@
     "artifacts/release/0.0.6",
     "artifacts/publish"
   ],
-  "cleanupRestriction": "Automatic approval review also rejected removal of source build caches, the new App verification folder, and the explicitly bounded temporary release download files. These outputs and preserved data remain; historical portable packages are deleted."
+  "cleanupRestriction": "Automatic approval review also rejected removal of source build caches, the new App verification folder, and the explicitly bounded temporary release download files. These outputs and preserved data remain; historical portable packages are deleted.",
+  "followupRecord": "cleanup-followup.json",
+  "userReauthorizedDeletion": true,
+  "followupResult": "Both bulk and reduced literal-directory deletion attempts were rejected by automatic approval before execution. No additional directories were removed.",
+  "remainingVerifiedDirectories": 634,
+  "remainingVerifiedOriginalBytes": 8641422958
 }
