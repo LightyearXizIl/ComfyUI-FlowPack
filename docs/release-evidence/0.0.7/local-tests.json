@@ -1,0 +1,13 @@
+{
+  "version": "0.0.7",
+  "resultsPath": "artifacts/acceptance/release-0.0.7/local/release.trx",
+  "passed": 368,
+  "failed": 0,
+  "skipped": 5,
+  "total": 373,
+  "command": ".\\build\\Build-Release.ps1 -Version 0.0.7",
+  "notes": [
+    "5 项按需专项跳过，失败为 0。",
+    "测试通过后继续完成 App、Worker 和安装器发布。"
+  ]
+}

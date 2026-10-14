@@ -4,7 +4,7 @@
 
 **2026-10-14**：修正导入门禁。只有工作流，或只有工作流和节点包但没有模型时，只要没有文件完整性、目标冲突、解析或分析错误，仍可点击导入/安装；缺失或未匹配依赖显示为提醒，真正阻塞问题继续在执行前复核。新增两种部分资源导入回归测试，并更新导入流程文档。
 
-本地标准 Release 已完成：**368 通过、0 失败、5 按需专项跳过**（373 总计）。安装器 **74893235 字节**，SHA-256 `3E60936E65A66EA9CF7A1B28AE48842695F057BF556B95B3234D882112965FDB`；App、Worker 与安装器校验清单位于 `../artifacts/installer`。远端 Actions、Release 资产及下载核验将在标签推送后补入本节。
+本地标准 Release 已完成：**368 通过、0 失败、5 按需专项跳过**（373 总计）。安装器 **74893235 字节**，SHA-256 `3E60936E65A66EA9CF7A1B28AE48842695F057BF556B95B3234D882112965FDB`；App、Worker 与安装器校验清单位于 `../artifacts/installer`。远端 [Release 工作流](https://github.com/LightyearXizIl/ComfyUI-FlowPack/actions/runs/38555556264) 已成功，正式 [v0.0.7 Release](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.7) 已发布。远端下载安装器 **74947639 字节**，SHA-256 `DCE74221F86EF1695362B445917BE7AF2CCDBD9B32C0285C74EDE9EE995C7A27`，与远端 `SHA256SUMS.txt` 一致；CI 构建包与本地构建包因构建环境不同，分别记录。
 
 ## 当前版本 · 0.0.6
 

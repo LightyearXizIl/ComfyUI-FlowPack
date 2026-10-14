@@ -1,0 +1,47 @@
+﻿{
+  "version": "0.0.7",
+  "tag": "v0.0.7",
+  "commit": "0c05ec4336ecc6ce82352ac05392ab549f70dd46",
+  "workflow": {
+    "id": 38555556264,
+    "url": "https://github.com/LightyearXizIl/ComfyUI-FlowPack/actions/runs/38555556264",
+    "conclusion": "success",
+    "duration": "4m20s"
+  },
+  "release": {
+    "url": "https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.7",
+    "publishedAt": "2026-10-14T11:22:03Z",
+    "assets": [
+      {
+        "name": "ComfyUI-FlowPack-0.0.7-Setup.exe",
+        "sizeBytes": 74947639,
+        "sha256": "DCE74221F86EF1695362B445917BE7AF2CCDBD9B32C0285C74EDE9EE995C7A27",
+        "apiDigest": "sha256:dce74221f86ef1695362b445917be7af2ccdbd9b32c0285c74ede9ee995c7a27"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "sizeBytes": 290,
+        "sha256": "C523045F8D15EDD735D195A3BEF09A431667B3DCD86E6C3FCB3C8CD1AD60B471",
+        "apiDigest": "sha256:c523045f8d15edd735d195a3bef09a431667b3dcd86e6c3fcb3c8cd1ad60b471"
+      }
+    ]
+  },
+  "remoteDownloadVerification": {
+    "installerMatchesSha256Sums": true,
+    "installerSizeBytes": 74947639,
+    "installerSha256": "DCE74221F86EF1695362B445917BE7AF2CCDBD9B32C0285C74EDE9EE995C7A27"
+  },
+  "localBuild": {
+    "tests": {
+      "passed": 368,
+      "failed": 0,
+      "skipped": 5,
+      "total": 373
+    },
+    "installerSizeBytes": 74893235,
+    "installerSha256": "3E60936E65A66EA9CF7A1B28AE48842695F057BF556B95B3234D882112965FDB",
+    "appSha256": "02D2BD39061AD1FBE8DE92AC71E4A82481260CA7EE84958CD9DDAA13BAA3B277",
+    "workerSha256": "3821B34ABBC9AD761E1B40047D8A12440321A4864157E4DDC711D29AABDC91BB"
+  },
+  "acceptanceNote": "本版本完成源码、Release 回归、CI 和远端安装器校验；没有新增 Desktop 推理或干净机器验收。"
+}
