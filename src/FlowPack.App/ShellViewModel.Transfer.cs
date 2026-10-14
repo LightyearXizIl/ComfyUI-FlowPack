@@ -39,9 +39,24 @@ public sealed partial class ShellViewModel
         _importError is not null ? "操作未完成，请查看详情。" :
         _importState == TransferState.Executing ? "正在安装…" : _importState == TransferState.Checking ? "正在自动检查资源与安装条件…" :
         !HasImportSource ? "选择文件后自动分析。" : SelectedInstance is null ? "请选择安装到的 ComfyUI。" :
-        HasImportProblems ? "有需要处理的项目，请查看左侧。" : _deployment?.Capability is { } c && !c.Allows(_deployment.RequiresPythonDependencies == true) ? "当前版本或布局尚不支持此安装。" :
+        _deployment is { BlockingReasons.Count: > 0 } ? "有需要处理的项目，请查看左侧。" :
+        _deployment?.Capability is { } c && !c.Allows(_deployment.RequiresPythonDependencies == true) ? "当前版本或布局尚不支持此安装。" :
+        HasImportProblems ? "资源已准备好，可以安装；部分依赖尚未补全。" :
         _deployment is null ? "请勾选要安装的资源。" : "资源已准备好，可以安装。";
-    public string ImportProblemNotice => _deployment is null ? "核对下面标出的资源用途或缺失依赖。" : string.Join("\n", _deployment.BlockingReasons.Distinct());
+    public string ImportProblemNotice
+    {
+        get
+        {
+            var notices = new List<string>();
+            if (_deployment?.BlockingReasons is { Count: > 0 } blockers) notices.AddRange(blockers);
+            if (HasUnresolvedDependencies)
+                notices.Add($"有 {UnresolvedDependencies.Count()} 项工作流依赖未在本次导入中提供；当前只安装已选资源。可稍后补全模型或节点包。");
+            if (HasOnlineResources)
+                notices.Add($"有 {OnlineResources.Count} 项清单资源尚未取得本地载荷；它们不会随本次安装写入。");
+            if (HasUnconfirmedImports) notices.Add("有资源用途尚未确认，确认后才能加入安装计划。");
+            return notices.Count == 0 ? "核对下面标出的资源用途或缺失依赖。" : string.Join("\n", notices.Distinct());
+        }
+    }
     public string ImportDetails => string.Join("\n", new[] { _importError, DeploymentGateNotice, ImportProblemNotice }.Where(x => !string.IsNullOrWhiteSpace(x)));
     public ICommand BeginExportCommand { get; private set; } = null!;
     public ICommand ClearExportSelectionCommand { get; private set; } = null!;

@@ -87,6 +87,8 @@ flowchart LR
 
 统一入口由 [ResourceImportService](../src/FlowPack.Infrastructure/ResourceImportService.cs) 识别 ZIP、工作流文件、资源目录、旧 `.cpack`、`.cpack.json` 和旧 JSON 清单。选择来源后自动分析、匹配本地资源并生成安装计划，默认使用当前实例；页面没有步骤编号，问题集中在“需要处理”，右侧保留目标、数量、空间、当前状态与安装按钮。来源、实例或选择改变后，旧结果不能重新启用安装按钮。历史记录记录来源与导入结果，再次使用时仍需走核对流程；分析本身不执行安装或自动关闭 ComfyUI。
 
+工作流依赖分析用于提示和补全，不要求本次来源同时携带全部模型、节点包或输入素材。只要已选载荷本身通过用途、完整性、目标冲突和实例能力检查，缺失或有歧义的工作流依赖不会阻止安装当前已选资源；这些依赖会留在页面提示中，供用户稍后补全。
+
 | 阶段 | 已实现的检查 | 结果含义 |
 |---|---|---|
 | 读取和解压 | [NativePackageStagingService](../src/FlowPack.Infrastructure/NativePackageStagingService.cs) 检查越界路径、符号链接、重复路径、Windows 保留名称、条目数量、磁盘空间、长度和 CRC。 | ZIP 解压到 FlowPack 专用暂存目录，尚未安装。 |

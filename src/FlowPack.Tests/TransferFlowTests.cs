@@ -160,6 +160,45 @@ public sealed class TransferFlowTests
         Assert.Null(typeof(ShellViewModel).GetField("_deployment", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(vm));
     });
 
+    [Fact]
+    public Task Partial_imports_allow_available_workflow_payload_without_a_model() => RunStaAsync(async () =>
+    {
+        await using var fixture = await Fixture.CreateAsync(false);
+        var vm = fixture.ViewModel;
+        await fixture.ScanAsync();
+        vm.SelectedInstance = fixture.TargetInstance;
+        await fixture.IdleAsync();
+
+        var workflowOnly = Path.Combine(fixture.Root, "workflow-only");
+        Directory.CreateDirectory(workflowOnly);
+        File.Copy(fixture.WorkflowPath, Path.Combine(workflowOnly, "workflow.json"));
+        await vm.ImportSourceAsync(workflowOnly);
+        await fixture.IdleAsync();
+
+        Assert.Equal(TransferState.Ready, vm.ImportState);
+        Assert.Contains(vm.ImportResources, x => x.Resource.Kind == ResourceKind.Workflow);
+        Assert.DoesNotContain(vm.ImportResources, x => x.Resource.Kind == ResourceKind.Model);
+        Assert.Contains(vm.DependencyRows, x => x.Dependency.Kind == ResourceKind.Model && x.Dependency.State == DependencyState.Missing);
+        Assert.Contains("工作流依赖未在本次导入中提供", vm.ImportProblemNotice);
+        Assert.True(vm.ExecuteDeploymentCommand.CanExecute(null));
+
+        var workflowAndNode = Path.Combine(fixture.Root, "workflow-and-node");
+        var nodeDirectory = Path.Combine(workflowAndNode, "custom_nodes", "TransferFixture");
+        Directory.CreateDirectory(nodeDirectory);
+        File.Copy(fixture.WorkflowPath, Path.Combine(workflowAndNode, "workflow.json"));
+        File.Copy(Path.Combine(Path.GetDirectoryName(fixture.WorkflowPath)!, "..", "..", "..", "custom_nodes", "TransferFixture", "__init__.py"),
+            Path.Combine(nodeDirectory, "__init__.py"));
+        await vm.ImportSourceAsync(workflowAndNode);
+        await fixture.IdleAsync();
+
+        Assert.Equal(TransferState.Ready, vm.ImportState);
+        Assert.Contains(vm.ImportResources, x => x.Resource.Kind == ResourceKind.Workflow);
+        Assert.Contains(vm.ImportResources, x => x.Resource.Kind == ResourceKind.CustomNode);
+        Assert.DoesNotContain(vm.ImportResources, x => x.Resource.Kind == ResourceKind.Model);
+        Assert.Contains(vm.DependencyRows, x => x.Dependency.Kind == ResourceKind.Model && x.Dependency.State == DependencyState.Missing);
+        Assert.True(vm.ExecuteDeploymentCommand.CanExecute(null));
+    });
+
     private static Task RunStaAsync(Func<Task> body)
     {
         var complete = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

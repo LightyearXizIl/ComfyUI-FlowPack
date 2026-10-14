@@ -410,8 +410,11 @@ public sealed class PersistentWorkerService : IAsyncDisposable
                 {
                     var inventory = await ImportInventoryService.MergeVerifiedAsync(await ScanRuntimeInventoryAsync(input.Instance, token), input.Resources, token);
                     var dependencies = await new InventoryDependencyAnalyzer().AnalyzeAsync(input.Workflows, inventory, token);
-                    proposed = proposed with { BlockingReasons = proposed.BlockingReasons.Concat(dependencies.Dependencies.Where(x => x.State != DependencyState.Present)
-                          .Select(x => "工作流依赖尚未解决：" + x.Reference + "（" + x.State + "）")).Concat(dependencies.Issues).ToArray() };
+                    // Missing or ambiguous workflow dependencies are advisory. The import plan
+                    // must still be able to deploy the resources that are actually present in
+                    // the selected payload (for example, a workflow without its model). File
+                    // integrity, target conflicts, and parser/analysis errors remain blockers.
+                    proposed = proposed with { BlockingReasons = proposed.BlockingReasons.Concat(dependencies.Issues).ToArray() };
                 }
                 return proposed with { Capability = _capabilities.Evaluate(proposed.Instance, proposed.RequiresPythonDependencies is true) };
             case "install.execute":

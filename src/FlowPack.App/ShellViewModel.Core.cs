@@ -408,7 +408,9 @@ public sealed partial class ShellViewModel
         if (SelectedInstance is not null && ImportResources.Any(x => x.IsSelected)) await PrepareDeploymentAsync();
         // Planning rebuilds dependency rows. Resolve sources on the final rows shown to the user.
         if (DependencyRows.Any(x => x.Dependency.State == DependencyState.Missing)) await ResolveSourcesAsync();
-        SetImportState(HasImportProblems ? TransferState.NeedsAttention : TransferState.Ready);
+        // Unresolved workflow dependencies are shown as warnings. Only the generated
+        // deployment plan's blockers determine whether the current payload can be installed.
+        SetImportState(_deployment is null || _deployment.BlockingReasons.Count > 0 ? TransferState.NeedsAttention : TransferState.Ready);
     }
     private async Task<DependencyAnalysis> PopulateDependenciesAsync(bool includeImported = true)
     {

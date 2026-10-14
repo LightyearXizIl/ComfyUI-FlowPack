@@ -143,7 +143,7 @@ public sealed class ImportInstanceRefreshTests
             vm.DependencyRows.Add(staged);
             vm.DependencyRows.Add(missingModel);
             Assert.Contains("工作流依赖：本地可复用 1 项，已暂存待安装 1 项，待解决 1 项。", vm.DeploymentSummary);
-            Assert.Contains("工作流依赖尚未解决", vm.DeploymentSummary);
+            Assert.Contains("工作流依赖未在本次导入中提供", vm.ImportProblemNotice);
         }
         finally
         {
