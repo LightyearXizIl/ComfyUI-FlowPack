@@ -64,11 +64,10 @@ public sealed class ShellViewModelTests
         var vm = new ShellViewModel();
         vm.NavigateCommand.Execute("Models"); vm.ResourceFilter = "model";
         vm.LocalModels.Add(new(new("m", ResourceKind.Model, "model", "fixture.pth", "upscale_models/fixture.pth")) { IsSelected = true });
-        var scope = typeof(ShellViewModel).GetField("_exportKind", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-        scope.SetValue(vm, ResourceKind.Model);
         vm.NavigateCommand.Execute("Packaging");
         Assert.Equal(FlowPage.Packaging, vm.CurrentPage);
-        Assert.True(vm.IsPackagingContext); Assert.Null(scope.GetValue(vm));
+        Assert.True(vm.IsPackagingContext);
+        Assert.Equal(ResourceKind.Model, Assert.Single(vm.ExportSelectionRows).Resource.Kind);
         vm.ReturnToResourcesCommand.Execute(null);
         Assert.Equal(1, vm.LibraryTabIndex); Assert.Equal("model", vm.ResourceFilter);
         vm.NavigateCommand.Execute("PackageWizard"); Assert.Equal(FlowPage.Packaging, vm.CurrentPage);
@@ -121,7 +120,7 @@ public sealed class ShellViewModelTests
 
         Assert.Equal("LightyearXizIl", viewModel.AuthorName);
         Assert.Equal("https://github.com/LightyearXizIl/ComfyUI-FlowPack", viewModel.RepositoryUrl);
-        Assert.Equal("0.0.7", viewModel.ApplicationVersion);
+        Assert.Equal("0.0.8", viewModel.ApplicationVersion);
         Assert.True(viewModel.OpenRepositoryCommand.CanExecute(null));
         Assert.True(viewModel.CopyRepositoryUrlCommand.CanExecute(null));
         Assert.True(viewModel.ExportDiagnosticsCommand.CanExecute(null));

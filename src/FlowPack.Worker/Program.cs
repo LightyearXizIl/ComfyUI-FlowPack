@@ -27,7 +27,7 @@ using (var cancellation = new CancellationTokenSource())
     Console.CancelKeyPress += (_, e) => { e.Cancel = true; cancellation.Cancel(); };
     var discovery = new DesktopInstanceDiscovery(configurationRoot: desktopProfile);
     await using var service = new PersistentWorkerService(new ResourceLibraryDatabase(library), discovery.DiscoverAsync,
-        associate: discovery.AssociateAsync);
+        associate: discovery.AssociateAsync, discoverReport: discovery.DiscoverReportAsync);
     try
     {
         await service.InitializeAsync(cancellation.Token);

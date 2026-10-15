@@ -8,6 +8,22 @@ namespace FlowPack.Tests;
 
 public sealed class PersistentWorkerServiceTests : IDisposable
 {
+    [Fact]
+    public async Task Discovery_job_preserves_report_evidence_in_worker_result()
+    {
+        var expected = new InstanceDiscoveryReport([], Path.Combine(_root, "profile"), ["checked"], ["skipped"], ["error"]);
+        await using var worker = new PersistentWorkerService(new ResourceLibraryDatabase(_root), discoverReport: _ => Task.FromResult(expected));
+        await worker.InitializeAsync();
+        var request = Request("instance.discover", new { });
+        await worker.HandleAsync(request, default);
+        var job = await WaitAsync(worker, request.RequestId);
+        Assert.Equal("Completed", job.State);
+        var actual = job.Result!.Value.Deserialize<InstanceDiscoveryReport>()!;
+        Assert.Equal(expected.ConfigurationRoot, actual.ConfigurationRoot);
+        Assert.Equal(expected.CheckedSources, actual.CheckedSources);
+        Assert.Equal(expected.SkippedSources, actual.SkippedSources);
+        Assert.Equal(expected.Errors, actual.Errors);
+    }
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

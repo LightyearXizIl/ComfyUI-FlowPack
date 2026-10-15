@@ -27,72 +27,19 @@ public sealed record InstanceDescriptor(
     { Instance = this };
 }
 
-/// <summary>Only reads launcher registration and configuration. Discovery never creates resource directories.</summary>
-public sealed class DesktopInstanceDiscovery(IDesktopPathProvider? paths = null, string? configurationRoot = null)
+public sealed record InstanceDiscoveryReport(
+    IReadOnlyList<InstanceDescriptor> Instances, string ConfigurationRoot,
+    IReadOnlyList<string> CheckedSources, IReadOnlyList<string> SkippedSources, IReadOnlyList<string> Errors);
+
+/// <summary>Only reads launcher registration and bounded local evidence. Discovery never creates resource directories.</summary>
+public sealed partial class DesktopInstanceDiscovery(IDesktopPathProvider? paths = null, string? configurationRoot = null)
 {
     private readonly IDesktopPathProvider _paths = paths ?? new EnvironmentDesktopPathProvider();
     private readonly bool _explicitConfigurationRoot = configurationRoot is not null;
     private string ConfigurationRoot => configurationRoot is null ? Path.Combine(_paths.RoamingApplicationData, "Comfy Desktop") : Path.GetFullPath(configurationRoot);
 
     public async Task<IReadOnlyList<InstanceDescriptor>> DiscoverAsync(CancellationToken token = default)
-    {
-        var result = new List<InstanceDescriptor>();
-        var configurationRoot = ConfigurationRoot;
-        var registry = Path.Combine(configurationRoot, "installations.json");
-        var settingsPath = Path.Combine(configurationRoot, "settings.json");
-        if (File.Exists(registry))
-        {
-            var registryText = await File.ReadAllTextAsync(registry, token);
-            var settingsText = File.Exists(settingsPath) ? await File.ReadAllTextAsync(settingsPath, token) : "{}";
-            using var settings = JsonDocument.Parse(settingsText);
-            using var records = JsonDocument.Parse(registryText);
-            if (records.RootElement.ValueKind != JsonValueKind.Array)
-                throw new InvalidDataException("新版 Desktop 的实例登记不是有效数组，不能回退到旧实例进行安装。");
-            foreach (var record in records.RootElement.EnumerateArray())
-            {
-                token.ThrowIfCancellationRequested();
-                if (record.ValueKind != JsonValueKind.Object || Text(record, "sourceId") == "cloud" ||
-                    !string.IsNullOrEmpty(Text(record, "workspaceId"))) continue;
-                var root = Text(record, "installPath");
-                var id = Text(record, "id");
-                if (string.IsNullOrEmpty(root) || string.IsNullOrEmpty(id) || !Path.IsPathFullyQualified(root)) continue;
-                try { result.Add(ReadRecord(record, settings.RootElement, root, id, settingsText)); }
-                catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or InvalidOperationException or UnauthorizedAccessException)
-                {
-                    var core = Path.Combine(root, "ComfyUI");
-                    result.Add(new(id, Text(record, "name") ?? id, "desktop-2", FindExecutable(), root, core, core,
-                        Path.Combine(core, "user"), Path.Combine(core, "user", "default", "workflows"), Path.Combine(core, "custom_nodes"),
-                        null, [], Path.Combine(core, "models"), [], Hash(record.GetRawText() + settingsText),
-                        ["实例配置无法解析，路径仅供检查，不允许安装：" + ex.Message]));
-                }
-            }
-        }
-
-        // A legacy config can coexist with an adopted modern registration. Do not duplicate that data root.
-        var legacyConfig = Path.Combine(_paths.RoamingApplicationData, "ComfyUI", "config.json");
-        // An explicit launcher profile must never absorb the user's default legacy environment.
-        if (!_explicitConfigurationRoot && File.Exists(legacyConfig))
-        {
-            var raw = await File.ReadAllTextAsync(legacyConfig, token);
-            using var doc = JsonDocument.Parse(raw);
-            var data = Text(doc.RootElement, "basePath");
-            if (data is not null && Path.IsPathFullyQualified(data) && Directory.Exists(data) &&
-                !result.Any(x => SamePath(x.DataDirectory, data)))
-            {
-                var models = Path.Combine(data, "models");
-                var extra = new List<ResourceSearchPath>();
-                var issues = new List<string>();
-                var evidence = new StringBuilder(raw);
-                ReadExtraYaml(Path.Combine(_paths.RoamingApplicationData, "ComfyUI", "extra_models_config.yaml"), extra, evidence, issues);
-                result.Add(new(Hash(data), "旧版 ComfyUI", "legacy", FindExecutable(), data, data, data,
-                    Path.Combine(data, "user"), Path.Combine(data, "user", "default", "workflows"),
-                    Path.Combine(data, "custom_nodes"), Existing(Path.Combine(data, ".venv", "Scripts", "python.exe")),
-                    [models], models, extra, Hash(evidence.ToString()), issues));
-            }
-        }
-        return result;
-    }
-
+        => (await DiscoverReportAsync(token).ConfigureAwait(false)).Instances;
     private InstanceDescriptor ReadRecord(JsonElement record, JsonElement settings, string root, string id, string settingsText)
     {
         var issues = new List<string>();

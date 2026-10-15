@@ -317,7 +317,7 @@ function Invoke-Worker([string]$Command, $Payload = @{}) {
         $pipe.Connect(10000)
         $reader = [IO.StreamReader]::new($pipe,[Text.Encoding]::UTF8,$false,8192,$true)
         $writer = [IO.StreamWriter]::new($pipe,[Text.UTF8Encoding]::new($false),8192,$true); $writer.AutoFlush=$true
-        $request = @{ protocolVersion='6'; requestId=[Guid]::NewGuid().ToString('N'); sessionSecret=$session.Secret; command=$Command; payload=$Payload }
+        $request = @{ protocolVersion='7'; requestId=[Guid]::NewGuid().ToString('N'); sessionSecret=$session.Secret; command=$Command; payload=$Payload }
         $writer.WriteLine(($request | ConvertTo-Json -Depth 35 -Compress))
         $responseTask = $reader.ReadLineAsync()
         if (-not $responseTask.Wait(15000)) { throw 'Worker response timed out.' }
@@ -418,9 +418,13 @@ try {
     Wait-Value { Get-MainWindow } 45 'actual portable App window' | Out-Null
     Wait-Value { Test-Path -LiteralPath (Join-Path $script:Library 'state\worker-session.json') } 45 'independent portable Worker session' | Out-Null
     $discovery = Wait-Job 'instance.discover'
-    $discoveredIds = @($discovery.Result | ForEach-Object Id)
+    $report = $discovery.Result
+    if ($null -eq $report.Instances -or $null -eq $report.CheckedSources -or $null -eq $report.SkippedSources -or $null -eq $report.Errors -or !$report.ConfigurationRoot) { throw 'Worker discovery did not return the instance discovery report contract.' }
+    if (-not ([string]$report.ConfigurationRoot).Equals($script:ScopeData.DesktopProfile,[StringComparison]::OrdinalIgnoreCase)) { throw 'Discovery report escaped the explicit profile.' }
+    Save-Json (Join-Path $script:RunRoot 'instance-discovery-report.json') $report
+    $discoveredIds = @($report.Instances | ForEach-Object Id)
     if ($discoveredIds.Count -ne $script:ScopeData.InstanceIds.Count -or @($discoveredIds | Where-Object { $_ -notin $script:ScopeData.InstanceIds }).Count -ne 0) { throw 'App discovery differs from the scope allowlist.' }
-    foreach ($instance in $discovery.Result) {
+    foreach ($instance in $report.Instances) {
         if (-not ([string]$instance.ConfigurationRoot).Equals($script:ScopeData.DesktopProfile,[StringComparison]::OrdinalIgnoreCase)) { throw 'Discovery escaped the explicit profile.' }
         foreach ($path in @($instance.InstallRoot,$instance.CoreDirectory,$instance.DataDirectory,$instance.UserDirectory,$instance.WorkflowsDirectory,$instance.CustomNodesDirectory,$instance.PythonPath,$instance.ModelsWriteDirectory,$instance.InputDirectory) + @($instance.ModelRoots) + @($instance.ExtraPaths | ForEach-Object Path)) { Assert-ScopePath $path }
     }
@@ -444,12 +448,16 @@ try {
     Invoke-Button '' 'Library.Export'
     Wait-Value { Find-One ([Windows.Automation.ControlType]::Button) '导出 ZIP…' -Enabled } 90 'automatic export plan' | Out-Null
     $modelName = [IO.Path]::GetFileName($script:ScopeData.ModelPath)
+    $plansBeforeCancel = @(Get-Jobs | Where-Object Operation -eq 'export.plan').Count
     Set-Check $modelName $false
-    Wait-Value { Find-One ([Windows.Automation.ControlType]::Button) '导出 ZIP…' -Enabled } 90 'manual deselection replanning' | Out-Null
+    Wait-Value { @(Get-Elements (Get-MainWindow) ([Windows.Automation.ControlType]::CheckBox) $modelName).Count -eq 0 } 10 'cancelled resource removed from the final export list' | Out-Null
+    Start-Sleep -Milliseconds 600
+    if (@(Get-Jobs | Where-Object Operation -eq 'export.plan').Count -ne $plansBeforeCancel) { throw 'A checkbox change automatically started a full ZIP plan.' }
+    Invoke-Button '更新导出预览'
+    Wait-Value { Find-One ([Windows.Automation.ControlType]::Button) '导出 ZIP…' -Enabled } 90 'explicit export preview update' | Out-Null
     Invoke-Button '返回资源库'; Invoke-Button '' 'Library.Export'
     Wait-Value { Find-One ([Windows.Automation.ControlType]::Button) '导出 ZIP…' -Enabled } 90 'return export plan' | Out-Null
-    $modelCheck = Find-One ([Windows.Automation.ControlType]::CheckBox) $modelName
-    if (([Windows.Automation.TogglePattern]$modelCheck.GetCurrentPattern([Windows.Automation.TogglePattern]::Pattern)).Current.ToggleState -ne [Windows.Automation.ToggleState]::Off) { throw 'Manual dependency deselection was restored on return.' }
+    if (@(Get-Elements (Get-MainWindow) ([Windows.Automation.ControlType]::CheckBox) $modelName).Count -ne 0) { throw 'Manual dependency deselection was restored on return.' }
     Save-UI '03-manual-dependency-cancelled'
     Invoke-Button '重新添加依赖'
     Wait-Value { Find-One ([Windows.Automation.ControlType]::Button) '导出 ZIP…' -Enabled } 90 'dependencies restored by explicit command' | Out-Null

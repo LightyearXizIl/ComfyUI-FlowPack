@@ -25,7 +25,7 @@
     </StackPanel></ScrollViewer></TabItem>
    </TabControl>
    <ScrollViewer Grid.Row="1" Style="{StaticResource PageScroll}" Margin="24,16,24,0" Visibility="{Binding IsStatusDetails,Converter={StaticResource Visible}}" AutomationProperties.AutomationId="Secondary.StatusScroll">
-    <StackPanel><TextBlock Text="{Binding HomeStatusTitle}" Style="{StaticResource SectionTitle}"/><TextBlock Text="{Binding HomeStatusSummary}" Style="{StaticResource SubtleText}" Margin="0,8,0,4"/>
+    <StackPanel><TextBlock Text="{Binding SecondaryStatusTitle}" Style="{StaticResource SectionTitle}"/><TextBlock Text="{Binding SecondaryStatusSummary}" Style="{StaticResource SubtleText}" Margin="0,8,0,4"/>
      <ItemsControl ItemsSource="{Binding HomeStatusDetailGroups}"><ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,24,0,0">
       <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="0,0,0,8"/>
       <ItemsControl ItemsSource="{Binding Lines}"><ItemsControl.ItemTemplate><DataTemplate><Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,12"><TextBlock Text="{Binding}" TextWrapping="Wrap" LineHeight="22"/></Border></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
@@ -33,7 +33,7 @@
     </StackPanel>
    </ScrollViewer>
    <Border Grid.Row="2" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="24,12" Margin="0,16,0,0"><DockPanel>
-    <Button DockPanel.Dock="Right" Content="复制完整记录" Command="{Binding CopySecondaryTextCommand}" CommandParameter="{Binding HomeStatusDetails}" Style="{StaticResource StandardActionButton}" Visibility="{Binding IsStatusDetails,Converter={StaticResource Visible}}" Margin="16,0,0,0"/>
+    <Button DockPanel.Dock="Right" Content="复制完整记录" Command="{Binding CopySecondaryTextCommand}" CommandParameter="{Binding SecondaryDetailsText}" Style="{StaticResource StandardActionButton}" Visibility="{Binding IsStatusDetails,Converter={StaticResource Visible}}" Margin="16,0,0,0"/>
     <StackPanel VerticalAlignment="Center"><TextBlock Text="Esc 关闭" Style="{StaticResource SubtleText}"/><TextBlock Text="{Binding SecondaryPanelNotice}" TextWrapping="Wrap"/></StackPanel>
    </DockPanel></Border>
   </Grid>

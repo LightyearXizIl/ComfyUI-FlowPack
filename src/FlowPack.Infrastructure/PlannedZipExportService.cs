@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using FlowPack.ComfyUI;
 using FlowPack.Core;
@@ -10,6 +11,28 @@ public sealed record ExportPlan(string Id, IReadOnlyList<ExportFile> Files, IRea
 
 public sealed class PlannedZipExportService
 {
+    private sealed record CachedHash(long Length, DateTime LastWriteTimeUtc, string Sha256);
+    // Worker creates a service per job; the process-local cache survives preview refreshes.
+    private static readonly ConcurrentDictionary<string, CachedHash> Hashes = new(StringComparer.OrdinalIgnoreCase);
+    private static async Task<ExportFile> PlanFileAsync(string file, string relative, CancellationToken token, IProgress<OperationProgress>? progress)
+    {
+        token.ThrowIfCancellationRequested();
+        var path = Path.GetFullPath(file);
+        var before = new FileInfo(path);
+        var length = before.Length;
+        var modified = before.LastWriteTimeUtc;
+        if (Hashes.TryGetValue(path, out var cached) && cached.Length == length && cached.LastWriteTimeUtc == modified)
+        {
+            progress?.Report(new("复用未变化文件的校验结果", length, length, "字节"));
+            return new(file, relative, length, cached.Sha256);
+        }
+        var hash = await ResourceImportService.HashAsync(path, token, progress);
+        var after = new FileInfo(path);
+        if (after.Length != length || after.LastWriteTimeUtc != modified) throw new IOException("规划过程中源文件已改变：" + relative);
+        if (Hashes.Count >= 8192) Hashes.Clear();
+        Hashes[path] = new(length, modified, hash);
+        return new(file, relative, length, hash);
+    }
     public async Task<ExportPlan> PlanAsync(IReadOnlyList<LocalResource> resources, IReadOnlyList<string>? dependencyIssues = null, CancellationToken token = default, IProgress<OperationProgress>? progress = null)
     {
         var entries = new Dictionary<string, ExportFile>(StringComparer.OrdinalIgnoreCase);
@@ -26,7 +49,7 @@ public sealed class PlannedZipExportService
                 {
                     var relative = "models/" + prefix + "/" + ResourceFiles.Relative(bundleRoot, file);
                     ValidateRelative(relative);
-                    var entry = new ExportFile(file, relative, new FileInfo(file).Length, await ResourceImportService.HashAsync(file, token, progress));
+                    var entry = await PlanFileAsync(file, relative, token, progress);
                     if (entries.TryGetValue(relative, out var previous) && previous.Sha256 != entry.Sha256) issues.Add("同名异内容资源不能改名打包：" + relative);
                     else entries.TryAdd(relative, entry);
                 }
@@ -42,7 +65,7 @@ public sealed class PlannedZipExportService
                     resource.Kind == ResourceKind.Model ? "models/" + (file == resource.SourcePath ? resource.RelativePath :
                         ((Path.GetDirectoryName(resource.RelativePath)?.Replace('\\', '/') is { Length: > 0 } folder ? folder + "/" : "") + ResourceFiles.Relative(Path.GetDirectoryName(resource.SourcePath)!, file))) : resource.RelativePath;
                 ValidateRelative(relative);
-                var entry = new ExportFile(file, relative, new FileInfo(file).Length, await ResourceImportService.HashAsync(file, token, progress));
+                var entry = await PlanFileAsync(file, relative, token, progress);
                 if (entries.TryGetValue(relative, out var existing))
                 {
                     if (existing.Sha256 != entry.Sha256) issues.Add("同名异内容资源不能改名打包：" + relative);

@@ -41,10 +41,60 @@ public interface IDesktopPathProvider
     string SystemDrive => Path.GetPathRoot(Environment.SystemDirectory)!;
     IReadOnlyList<string> GetProcessModulePaths(string processName);
     IReadOnlyList<string> GetRegisteredDesktopExecutables() => [];
+    /// <summary>Optional process command-line evidence. Implementations may return an empty list when unavailable.</summary>
+    IReadOnlyList<string> GetProcessCommandLines(string processName) => [];
+    /// <summary>Optional user-data roots supplied by the host or launcher.</summary>
+    IReadOnlyList<string> GetCustomUserDataDirectories() => [];
 }
 
 public sealed class EnvironmentDesktopPathProvider : IDesktopPathProvider
 {
+    public IReadOnlyList<string> GetProcessCommandLines(string processName)
+    {
+        if (!OperatingSystem.IsWindows()) return [];
+        var result = new List<string>();
+        foreach (var process in Process.GetProcessesByName(processName))
+        {
+            using (process)
+            {
+                var handle = OpenProcess(0x1000, false, process.Id); // PROCESS_QUERY_LIMITED_INFORMATION
+                if (handle == IntPtr.Zero) continue;
+                try
+                {
+                    // ProcessCommandLineInformation reads the same bounded command-line
+                    // evidence as Task Manager without spawning a visible shell or WMI.
+                    NtQueryInformationProcess(handle, 60, IntPtr.Zero, 0, out var size);
+                    if (size <= Marshal.SizeOf<UnicodeString>() || size > 1024 * 1024) continue;
+                    var buffer = Marshal.AllocHGlobal(size);
+                    try
+                    {
+                        if (NtQueryInformationProcess(handle, 60, buffer, size, out _) != 0) continue;
+                        var text = Marshal.PtrToStructure<UnicodeString>(buffer);
+                        if (text.Length > 0 && text.Buffer != IntPtr.Zero)
+                        {
+                            var value = Marshal.PtrToStringUni(text.Buffer, text.Length / 2);
+                            if (!string.IsNullOrWhiteSpace(value)) result.Add(value);
+                        }
+                    }
+                    finally { Marshal.FreeHGlobal(buffer); }
+                }
+                catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or System.ComponentModel.Win32Exception) { }
+                finally { CloseHandle(handle); }
+            }
+        }
+        return result;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct UnicodeString { public ushort Length; public ushort MaximumLength; public IntPtr Buffer; }
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint access, bool inherit, int processId);
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr handle);
+    [DllImport("ntdll.dll")]
+    private static extern int NtQueryInformationProcess(IntPtr process, int informationClass, IntPtr information, int informationLength, out int returnLength);
+
     public IReadOnlyList<string> GetRegisteredDesktopExecutables()
     {
         if (!OperatingSystem.IsWindows()) return [];
@@ -91,6 +141,7 @@ public sealed class EnvironmentDesktopPathProvider : IDesktopPathProvider
             return [];
         }
     }
+
 }
 
 public sealed class ComfyDesktopDetector : IComfyDesktopDetector

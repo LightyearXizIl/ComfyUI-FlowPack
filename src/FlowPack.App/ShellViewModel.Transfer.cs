@@ -14,8 +14,11 @@ public enum TransferState { Empty, Checking, Ready, NeedsAttention, Executing, C
 public sealed partial class ShellViewModel
 {
     private long _exportInputRevision;
-    private bool _exportRefreshPending, _changingExportSelection, _pendingInstanceScan;
+    private bool _changingExportSelection, _pendingInstanceScan;
     private readonly HashSet<string> _analyzedExportWorkflows = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _automaticallySelectedExportPaths = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _manuallyExcludedExportPaths = new(StringComparer.OrdinalIgnoreCase);
+    private CancellationTokenSource? _exportPlanningCancellation;
     private TransferState _exportState, _importState;
     private string _exportNotice = "选择资源后，软件会自动整理导出清单。";
     private string? _importError;
@@ -23,7 +26,7 @@ public sealed partial class ShellViewModel
     public IReadOnlyList<ResourceSelection> SelectedExportResources => LocalWorkflows.Concat(LocalModels).Concat(LocalNodes).Concat(LocalExportAssets).Where(x => x.IsSelected).ToArray();
     public string ExportSelectionSummary => $"已选 {SelectedExportResources.Count} 项";
     public string ExportContentsSummary => $"工作流 {SelectedExportResources.Count(x => x.Resource.Kind == ResourceKind.Workflow)} · 模型 {SelectedExportResources.Count(x => x.Resource.Kind == ResourceKind.Model)} · 节点包 {SelectedExportResources.Count(x => x.Resource.Kind == ResourceKind.CustomNode)} · 输入素材 {SelectedExportResources.Count(x => x.Resource.Kind == ResourceKind.Asset)}\n" +
-        (_zipExport is null ? "调整选择后自动检查大小。" : $"共 {_zipExport.Files.Count} 个文件 · {FormatBytes(_zipExport.TotalBytes)}");
+        (_zipExport is null ? "选择已更新，可更新预览或直接导出。" : $"共 {_zipExport.Files.Count} 个文件 · 资源总字节数 {FormatBytes(_zipExport.TotalBytes)}");
     public string ExportStatus => _exportNotice;
     public TransferState ExportState => _exportState;
     public TransferState ImportState => _importState;
@@ -69,8 +72,6 @@ public sealed partial class ShellViewModel
         {
             if (SelectedExportResources.Count == 0) { CurrentPage = FlowPage.Library; LibraryTabIndex = 0; return; }
             CurrentPage = FlowPage.Packaging;
-            _exportKind = null;
-            _exportWorkflows = _exportModels = _exportNodes = true;
             SyncExportRows();
             if (_inventory is not null) _ = ExecuteCoreAsync(async () => { await AddExportDependenciesAsync(false); await PrepareZipAsync(); });
             else SetExportState(TransferState.NeedsAttention, "请先在首页扫描当前实例。");
@@ -80,7 +81,9 @@ public sealed partial class ShellViewModel
             _changingExportSelection = true;
             try { foreach (var row in SelectedExportResources) row.IsSelected = false; }
             finally { _changingExportSelection = false; }
-            ExportSelectionRows.Clear(); _analyzedExportWorkflows.Clear(); InvalidateExport();
+            ExportSelectionRows.Clear(); _analyzedExportWorkflows.Clear(); _automaticallySelectedExportPaths.Clear(); _manuallyExcludedExportPaths.Clear();
+            foreach (var row in LocalWorkflows.Concat(LocalModels).Concat(LocalNodes).Concat(LocalExportAssets)) row.ExportSelectionOrigin = ExportSelectionOrigin.User;
+            InvalidateExport();
             SetExportState(TransferState.Empty, "请在资源库选择要导出的资源。");
         }, _ => CoreReady && SelectedExportResources.Count > 0);
         ReAddExportDependenciesCommand = new RelayCommand(_ => _ = ExecuteCoreAsync(async () => { await AddExportDependenciesAsync(true); await PrepareZipAsync(); }),
@@ -100,19 +103,20 @@ public sealed partial class ShellViewModel
     {
         if (e.OldItems is not null) foreach (ResourceSelection row in e.OldItems) row.PropertyChanged -= ResourceExportChoiceChanged;
         if (e.NewItems is not null) foreach (ResourceSelection row in e.NewItems) { row.PropertyChanged -= ResourceExportChoiceChanged; row.PropertyChanged += ResourceExportChoiceChanged; }
-        InvalidateExport();
+        SyncExportRows(); InvalidateExport();
     }
     private void SyncExportRows()
     {
         foreach (var row in SelectedExportResources)
             if (!ExportSelectionRows.Contains(row)) ExportSelectionRows.Add(row);
-        var local = LocalWorkflows.Concat(LocalModels).Concat(LocalNodes).Concat(LocalExportAssets).ToHashSet();
-        foreach (var row in ExportSelectionRows.Where(x => !local.Contains(x)).ToArray()) ExportSelectionRows.Remove(row);
+        var selected = SelectedExportResources.ToHashSet();
+        foreach (var row in ExportSelectionRows.Where(x => !selected.Contains(x)).ToArray()) ExportSelectionRows.Remove(row);
         NotifyTransferState();
     }
     private async Task AddExportDependenciesAsync(bool force)
     {
         if (_inventory is not { } inventory) return;
+        if (force) _manuallyExcludedExportPaths.Clear();
         var workflows = LocalWorkflows.Where(x => x.IsSelected && (force || !_analyzedExportWorkflows.Contains(x.Path))).ToArray();
         if (workflows.Length == 0) return;
         var revision = _exportInputRevision;
@@ -132,13 +136,20 @@ public sealed partial class ShellViewModel
             foreach (var d in analysis.Dependencies.Where(x => x.Candidates.Count == 1 && (x.State == DependencyState.Present || x.Kind == ResourceKind.CustomNode && x.State == DependencyState.Unresolved)))
             {
                 var row = LocalModels.Concat(LocalNodes).Concat(LocalExportAssets).FirstOrDefault(x => string.Equals(x.Path, d.Candidates[0].SourcePath, StringComparison.OrdinalIgnoreCase));
-                if (row is not null) row.IsSelected = true;
+                if (row is not null) SelectAutomaticExportDependency(row);
             }
             foreach (var row in workflows) _analyzedExportWorkflows.Add(row.Path);
         }
         finally { _changingExportSelection = false; }
         PopulateLibraryDependencyGroups(analysis.Dependencies);
         SyncExportRows();
+    }
+    private void SelectAutomaticExportDependency(ResourceSelection row)
+    {
+        if (_manuallyExcludedExportPaths.Contains(row.Path) || row.IsSelected) return;
+        _automaticallySelectedExportPaths.Add(row.Path);
+        row.ExportSelectionOrigin = ExportSelectionOrigin.AutomaticDependency;
+        row.IsSelected = true;
     }
     private void SetExportState(TransferState state, string notice)
     {
@@ -152,17 +163,6 @@ public sealed partial class ShellViewModel
     {
         foreach (var name in new[] { nameof(ExportSelectionSummary), nameof(ExportContentsSummary), nameof(ExportStatus), nameof(ExportState), nameof(ImportState), nameof(ImportError), nameof(HasSourceImportError), nameof(HasImportSource), nameof(HasImportProblems), nameof(HasUnconfirmedImports), nameof(UnresolvedDependencies), nameof(HasUnresolvedDependencies), nameof(ImportContentSummary), nameof(ImportCountsSummary), nameof(ImportStatus), nameof(ImportProblemNotice), nameof(ImportDetails) }) OnPropertyChanged(name);
         CommandManager.InvalidateRequerySuggested();
-    }
-    private async Task QueueExportRefreshAsync()
-    {
-        await Task.Delay(180);
-        if (!_exportRefreshPending || _coreBusy || CurrentPage != FlowPage.Packaging) return;
-        await ExecuteCoreAsync(async () =>
-        {
-            _exportRefreshPending = false;
-            if (SelectedExportResources.Count > 0) await PrepareZipAsync();
-            else SetExportState(TransferState.Empty, "请返回资源库选择资源。");
-        });
     }
     public Task ExportZipToAsync(string destination) => ExecuteCoreAsync(() => WriteExportZipAsync(destination));
     private async Task WriteExportZipAsync(string destination)

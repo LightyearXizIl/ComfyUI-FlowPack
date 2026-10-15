@@ -35,7 +35,114 @@ public sealed class DesktopInstanceDiscoveryTests : IDisposable, IDesktopPathPro
     public string UserProfile => Path.Combine(_root, "home");
     public string SystemDrive => Path.GetPathRoot(_root)!;
     public IReadOnlyList<string> GetRegisteredDesktopExecutables() => [Path.Combine(_root, "Desktop", "Comfy Desktop.exe")];
-    public IReadOnlyList<string> GetProcessModulePaths(string processName) => [];
+    private IReadOnlyList<string> _processModules = [];
+    private IReadOnlyList<string> _processCommands = [];
+    public IReadOnlyList<string> GetProcessModulePaths(string processName) => processName == "Comfy Desktop" ? _processModules : [];
+    public IReadOnlyList<string> GetProcessCommandLines(string processName) => processName == "Comfy Desktop" ? _processCommands : [];
+
+    [Fact]
+    public async Task Report_explains_empty_discovery_and_skipped_non_local_records()
+    {
+        WriteConfig(new object[] {
+            1, new { id = "cloud", sourceId = "cloud", installPath = _root },
+            new { id = "workspace", workspaceId = "w", installPath = _root },
+            new { id = "relative", installPath = "relative" }
+        }, new { });
+        var report = await new DesktopInstanceDiscovery(this).DiscoverReportAsync();
+        Assert.Empty(report.Instances);
+        Assert.Equal(Path.Combine(RoamingApplicationData, "Comfy Desktop"), report.ConfigurationRoot);
+        Assert.Contains(Path.Combine(report.ConfigurationRoot, "installations.json"), report.CheckedSources);
+        Assert.Contains(report.SkippedSources, x => x.Contains("cloud"));
+        Assert.Contains(report.SkippedSources, x => x.Contains("workspaceId"));
+        Assert.Contains(report.SkippedSources, x => x.Contains("不是绝对路径"));
+        Assert.Empty(report.Errors);
+    }
+
+    [Fact]
+    public async Task Bad_shared_settings_preserve_valid_registration_but_disable_installation()
+    {
+        var install = Path.Combine(_root, "managed");
+        Write(Path.Combine(install, "ComfyUI", "main.py"), "");
+        Write(Path.Combine(install, ".comfyui-desktop-2"), "good");
+        Write(Path.Combine(install, "ComfyUI", ".venv", "Scripts", "python.exe"), "python");
+        WriteConfig(new[] { new { id = "good", sourceId = "standalone", installPath = install } }, new { });
+        Write(Path.Combine(RoamingApplicationData, "Comfy Desktop", "settings.json"), "{broken");
+        var report = await new DesktopInstanceDiscovery(this).DiscoverReportAsync();
+        var found = Assert.Single(report.Instances);
+        Assert.Equal("good", found.Id);
+        Assert.Contains(found.Issues, x => x.Contains("共享设置无法读取"));
+        Assert.Contains(report.Errors, x => x.Contains("settings.json"));
+    }
+
+    [Fact]
+    public async Task Local_only_install_and_shared_resources_are_read_only_candidates()
+    {
+        var install = Path.Combine(LocalApplicationData, "Comfy-Desktop", "ComfyUI-Installs", "local");
+        var shared = Path.Combine(LocalApplicationData, "Comfy-Desktop", "ComfyUI-Shared");
+        Write(Path.Combine(install, "ComfyUI", "main.py"), "# local core");
+        Directory.CreateDirectory(Path.Combine(install, "ComfyUI", "models"));
+        Directory.CreateDirectory(Path.Combine(shared, "models"));
+        var report = await new DesktopInstanceDiscovery(this).DiscoverReportAsync();
+        Assert.Equal(2, report.Instances.Count);
+        Assert.All(report.Instances, x => { Assert.Equal("manual-readonly", x.Generation); Assert.False(x.IsModern); Assert.NotEmpty(x.Issues); });
+        Assert.Contains(report.Instances, x => x.InstallRoot == install);
+        Assert.Contains(report.Instances, x => x.DataDirectory == shared);
+        Assert.Contains(Path.Combine(LocalApplicationData, "Comfy-Desktop", "ComfyUI-Installs"), report.CheckedSources);
+    }
+
+    [Fact]
+    public async Task Running_process_user_data_profile_is_read_without_absorbing_it_into_explicit_profile()
+    {
+        var privateProfile = Path.Combine(_root, "private profile");
+        var install = Path.Combine(_root, "private install");
+        Write(Path.Combine(install, "ComfyUI", "main.py"), "");
+        Write(Path.Combine(install, ".comfyui-desktop-2"), "private");
+        Write(Path.Combine(install, "ComfyUI", ".venv", "Scripts", "python.exe"), "python");
+        Write(Path.Combine(privateProfile, "installations.json"), JsonSerializer.Serialize(new[] { new { id = "private", installPath = install, sourceId = "standalone", useSharedModels = false } }));
+        _processCommands = ["\"C:\\Desktop\\Comfy Desktop.exe\" --user-data-dir=\"" + privateProfile + "\""];
+        var report = await new DesktopInstanceDiscovery(this).DiscoverReportAsync();
+        Assert.Equal(privateProfile, Assert.Single(report.Instances).ConfigurationRoot);
+        Assert.Contains(Path.Combine(privateProfile, "installations.json"), report.CheckedSources);
+        var other = Path.Combine(_root, "explicit");
+        Write(Path.Combine(other, "installations.json"), "[]");
+        Assert.Empty((await new DesktopInstanceDiscovery(this, other).DiscoverReportAsync()).Instances);
+    }
+
+    [Fact]
+    public async Task Conflicting_instance_id_across_profiles_keeps_first_root_and_reports_the_other()
+    {
+        var first = Path.Combine(_root, "default install");
+        var second = Path.Combine(_root, "private install");
+        foreach (var install in new[] { first, second })
+        {
+            Write(Path.Combine(install, "ComfyUI", "main.py"), "");
+            Write(Path.Combine(install, ".comfyui-desktop-2"), "same-id");
+            Write(Path.Combine(install, "ComfyUI", ".venv", "Scripts", "python.exe"), "python");
+        }
+        WriteConfig(new[] { new { id = "same-id", installPath = first, sourceId = "standalone", useSharedModels = false } }, new { });
+        var privateProfile = Path.Combine(_root, "private profile");
+        Write(Path.Combine(privateProfile, "installations.json"), JsonSerializer.Serialize(new[] { new { id = "same-id", installPath = second, sourceId = "standalone", useSharedModels = false } }));
+        _processCommands = ["desktop --user-data-dir=\"" + privateProfile + "\""];
+        var report = await new DesktopInstanceDiscovery(this).DiscoverReportAsync();
+        Assert.Equal(first, Assert.Single(report.Instances).InstallRoot);
+        Assert.Contains(report.Errors, x => x.Contains("same-id") && x.Contains(first) && x.Contains(second));
+        Assert.Contains(report.SkippedSources, x => x.Contains("冲突") && x.Contains(second));
+    }
+
+    [Fact]
+    public async Task Corrupt_registry_and_legacy_json_do_not_hide_process_candidate()
+    {
+        var runtime = Path.Combine(_root, "running");
+        Write(Path.Combine(runtime, "resources", "ComfyUI", "main.py"), "# core");
+        _processModules = [Path.Combine(runtime, "Comfy Desktop.exe")];
+        Write(Path.Combine(RoamingApplicationData, "Comfy Desktop", "installations.json"), "{bad");
+        Write(Path.Combine(RoamingApplicationData, "ComfyUI", "config.json"), "{bad");
+        var report = await new DesktopInstanceDiscovery(this).DiscoverReportAsync();
+        Assert.Single(report.Instances);
+        Assert.Equal("manual-readonly", report.Instances[0].Generation);
+        Assert.Equal(2, report.Errors.Count);
+        Assert.Contains(Path.Combine(runtime, "resources", "ComfyUI"), report.CheckedSources);
+    }
 
     [Fact]
     public async Task Adopted_registration_preserves_user_python_and_shared_models_without_creating_workflows()

@@ -3,6 +3,8 @@
 **/obj/
 artifacts/release/
 artifacts/build/
+artifacts/verification/
+artifacts/discovery-tests/
 artifacts/user-data/
 artifacts/publish/
 artifacts/portable/

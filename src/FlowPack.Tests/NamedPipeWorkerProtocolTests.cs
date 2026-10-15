@@ -65,7 +65,7 @@ public sealed class NamedPipeWorkerProtocolTests
 
         var response = await new NamedPipeWorkerClient().SendAsync(
             pipeName,
-            new WorkerRequest("999", "request-3", "test-session-secret", WorkerProtocol.PingCommand),
+            new WorkerRequest("6", "request-3", "test-session-secret", WorkerProtocol.PingCommand),
             TimeSpan.FromSeconds(5));
         await serverTask;
 

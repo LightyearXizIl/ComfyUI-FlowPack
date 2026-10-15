@@ -27,7 +27,8 @@
       </DockPanel>
       <TextBlock Text="{Binding SelectedInstance.DisplayName,TargetNullValue=尚未选择实例,FallbackValue=尚未选择实例}" TextTrimming="CharacterEllipsis" FontWeight="SemiBold" ToolTip="{Binding SelectedInstance.DisplayName}" Margin="0,0,0,4"/>
       <TextBlock Text="{Binding InstanceVersions}" Style="{StaticResource SubtleText}" Margin="0,0,0,8"/>
-      <WrapPanel><views:FolderShortcutsView ShowLabel="False"/><Button Content="版本详情" Command="{Binding OpenInstanceDetailsCommand}" CommandParameter="Versions" Margin="0,0,8,8" AutomationProperties.AutomationId="Home.Versions"/><Button Content="资源目录" Command="{Binding OpenInstanceDetailsCommand}" CommandParameter="Directories" Margin="0,0,0,8" AutomationProperties.AutomationId="Home.Directories"/></WrapPanel>
+       <WrapPanel><views:FolderShortcutsView ShowLabel="False"/><Button Content="版本详情" Command="{Binding OpenInstanceDetailsCommand}" CommandParameter="Versions" Margin="0,0,8,8" AutomationProperties.AutomationId="Home.Versions"/><Button Content="资源目录" Command="{Binding OpenInstanceDetailsCommand}" CommandParameter="Directories" Margin="0,0,8,8" AutomationProperties.AutomationId="Home.Directories"/><Button Content="检测详情" Command="{Binding OpenDiscoveryDetailsCommand}" Margin="0,0,0,8" AutomationProperties.AutomationId="Home.DiscoveryDetails"/></WrapPanel>
+       <TextBlock Text="{Binding DiscoverySummary}" Style="{StaticResource SubtleText}" TextWrapping="Wrap" AutomationProperties.AutomationId="Home.DiscoverySummary"/>
      </StackPanel>
     </Border>
     <Border Grid.Row="2" Style="{StaticResource Card}" MinHeight="158" AutomationProperties.AutomationId="Home.Shortcuts">

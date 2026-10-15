@@ -7,7 +7,7 @@ using FlowPack.Core;
 
 namespace FlowPack.App;
 
-public enum SecondaryPanelKind { None, Instance, Status }
+public enum SecondaryPanelKind { None, Instance, Status, Discovery }
 public sealed record InstanceDetailField(string Label, string Value);
 public sealed record InstanceDirectoryRow(string InstanceId, string Label, string Path);
 public sealed record StatusDetailGroup(string Title, IReadOnlyList<string> Lines);
@@ -20,9 +20,12 @@ public sealed partial class ShellViewModel
     public SecondaryPanelKind SecondaryPanel => _secondaryPanel;
     public bool IsSecondaryPanelOpen => _secondaryPanel != SecondaryPanelKind.None;
     public bool IsInstanceDetails => _secondaryPanel == SecondaryPanelKind.Instance;
-    public bool IsStatusDetails => _secondaryPanel == SecondaryPanelKind.Status;
-    public string SecondaryPanelTitle => IsInstanceDetails ? "实例详情" : "状态详情";
-    public string SecondaryPanelSubtitle => SelectedInstance?.DisplayName ?? "尚未选择实例";
+    public bool IsStatusDetails => _secondaryPanel is SecondaryPanelKind.Status or SecondaryPanelKind.Discovery;
+    public string SecondaryPanelTitle => IsInstanceDetails ? "实例详情" : _secondaryPanel == SecondaryPanelKind.Discovery ? "实例检测详情" : "状态详情";
+    public string SecondaryPanelSubtitle => _secondaryPanel == SecondaryPanelKind.Discovery ? "配置来源与检测结果" : SelectedInstance?.DisplayName ?? "尚未选择实例";
+    public string SecondaryStatusTitle => _secondaryPanel == SecondaryPanelKind.Discovery ? "实例检测结果" : HomeStatusTitle;
+    public string SecondaryStatusSummary => _secondaryPanel == SecondaryPanelKind.Discovery ? DiscoverySummary : HomeStatusSummary;
+    public string SecondaryDetailsText => _secondaryPanel == SecondaryPanelKind.Discovery ? DiscoveryDetails : HomeStatusDetails;
     public string SecondaryPanelNotice => _secondaryPanelNotice;
     public int InstanceDetailTabIndex
     {
@@ -59,6 +62,7 @@ public sealed partial class ShellViewModel
     {
         get
         {
+            if (_secondaryPanel == SecondaryPanelKind.Discovery) return DiscoveryDetailGroups;
             var groups = new List<StatusDetailGroup>();
             if (!HomeShowsScan && CoreNotice != "等待扫描 Desktop 实例。" && !string.IsNullOrWhiteSpace(CoreNotice))
                 groups.Add(new("最近操作", CoreNotice.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)));
@@ -78,7 +82,7 @@ public sealed partial class ShellViewModel
     public ICommand CloseSecondaryPanelCommand => _closeSecondaryPanel ??= new RelayCommand(_ => CloseSecondaryPanel(), _ => IsSecondaryPanelOpen);
     public ICommand CopySecondaryTextCommand => _copySecondaryText ??= new RelayCommand(value =>
     {
-        try { Clipboard.SetText(value is string text ? text : HomeStatusDetails); SetSecondaryNotice("已复制。"); }
+        try { Clipboard.SetText(value is string text ? text : _secondaryPanel == SecondaryPanelKind.Discovery ? DiscoveryDetails : HomeStatusDetails); SetSecondaryNotice("已复制。"); }
         catch (COMException) { SetSecondaryNotice("剪贴板暂时不可用，请稍后重试。"); }
     });
     public ICommand OpenInstanceDirectoryCommand => _openInstanceDirectory ??= new RelayCommand(value =>
@@ -115,7 +119,7 @@ public sealed partial class ShellViewModel
     private void SetSecondaryNotice(string notice) { _secondaryPanelNotice = notice; OnPropertyChanged(nameof(SecondaryPanelNotice)); }
     private void NotifySecondaryContent()
     {
-        foreach (var name in new[] { nameof(SecondaryPanelTitle), nameof(SecondaryPanelSubtitle), nameof(SecondaryPanelNotice), nameof(InstanceVersionFields), nameof(InstanceDirectoryRows), nameof(HomeStatusDetailGroups) }) OnPropertyChanged(name);
+        foreach (var name in new[] { nameof(SecondaryPanelTitle), nameof(SecondaryPanelSubtitle), nameof(SecondaryPanelNotice), nameof(SecondaryStatusTitle), nameof(SecondaryStatusSummary), nameof(SecondaryDetailsText), nameof(InstanceVersionFields), nameof(InstanceDirectoryRows), nameof(HomeStatusDetailGroups) }) OnPropertyChanged(name);
         CommandManager.InvalidateRequerySuggested();
     }
 }

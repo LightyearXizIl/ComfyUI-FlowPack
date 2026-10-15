@@ -131,7 +131,13 @@ public sealed class WorkerLibraryClient(string libraryPath, bool allowWorkerLaun
     }
     private static async Task<bool> PingAsync(WorkerSession session, CancellationToken token)
     {
-        try { return (await new NamedPipeWorkerClient().SendAsync(session.Pipe, new(WorkerProtocol.Version, Guid.NewGuid().ToString("N"), session.Secret, WorkerProtocol.PingCommand), TimeSpan.FromMilliseconds(300), token).ConfigureAwait(false)).Succeeded; }
+        try
+        {
+            var response = await new NamedPipeWorkerClient().SendAsync(session.Pipe, new(WorkerProtocol.Version, Guid.NewGuid().ToString("N"), session.Secret, WorkerProtocol.PingCommand), TimeSpan.FromMilliseconds(300), token).ConfigureAwait(false);
+            if (response.Error?.Code == "unsupported-protocol")
+                throw new InvalidOperationException("资源库的 Worker 协议版本不兼容。请通过旧版 FlowPack 的应用内更新安全结束后台；若已手动安装新版，请先在旧版确认任务结束，再重新启动 Windows 后打开新版。当前连接需要协议 " + WorkerProtocol.Version + "。");
+            return response.Succeeded;
+        }
         catch (Exception ex) when (ex is IOException or OperationCanceledException) { token.ThrowIfCancellationRequested(); return false; }
     }
     public async Task StopWhenIdleAsync(CancellationToken token = default)

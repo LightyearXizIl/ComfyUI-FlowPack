@@ -428,6 +428,8 @@ public sealed class UiShellTests
                 Assert.Contains(Descendants(pageHost).OfType<Button>(), button =>
                     button.Command == viewModel.ImportDraftCommand);
                 Assert.Contains(Descendants(pageHost).OfType<Button>(), button =>
+                    Equals(button.Content, "更新导出预览") && button.Command == viewModel.PreviewZipCommand);
+                Assert.Contains(Descendants(pageHost).OfType<Button>(), button =>
                     Equals(button.Content, "导出 ZIP…") && button.Command == viewModel.SaveZipCommand);
 
                 foreach (var size in new[] { (Width: 960d, Height: 640d), (Width: 1280d, Height: 800d), (Width: 1600d, Height: 900d) })

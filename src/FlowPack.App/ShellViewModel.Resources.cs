@@ -34,9 +34,14 @@ public sealed partial class ShellViewModel
     
     private long _librarySelectionRevision;
     private bool _exportWorkflows = true, _exportModels = true, _exportNodes = true;
-    public bool ExportWorkflows { get => _exportWorkflows; set { _exportWorkflows = value; InvalidateExport(); } }
-    public bool ExportModels { get => _exportModels; set { _exportModels = value; InvalidateExport(); } }
-    public bool ExportNodes { get => _exportNodes; set { _exportNodes = value; InvalidateExport(); } }
+    public bool ExportWorkflows { get => _exportWorkflows; set { _exportWorkflows = value; SelectExportKind(ResourceKind.Workflow, value); } }
+    public bool ExportModels { get => _exportModels; set { _exportModels = value; SelectExportKind(ResourceKind.Model, value); } }
+    public bool ExportNodes { get => _exportNodes; set { _exportNodes = value; SelectExportKind(ResourceKind.CustomNode, value); } }
+    private void SelectExportKind(ResourceKind kind, bool selected)
+    {
+        foreach (var row in LocalWorkflows.Concat(LocalModels).Concat(LocalNodes).Where(x => x.Resource.Kind == kind)) row.IsSelected = selected;
+        InvalidateExport();
+    }
     public string InstanceVersions => $"ComfyUI Core  {_inventory?.RunningCoreVersion ?? _inventory?.CoreVersion ?? "未确认"}     Desktop  {_inventory?.DesktopVersion ?? "未确认"}";
     public string InstanceVersionDetails => _inventory?.RunningCoreVersion is { } running && _inventory.CoreVersion is { } disk && running != disk ?
         $"磁盘 Core：{disk}；运行 Core：{running}。\n" : "";
@@ -80,7 +85,12 @@ public sealed partial class ShellViewModel
             (x.State == DependencyState.Present || x.Kind == ResourceKind.CustomNode && x.State == DependencyState.Unresolved)))
         {
             var payload = LocalModels.Concat(LocalNodes).SingleOrDefault(x => x.Path == dependency.Candidates[0].SourcePath);
-            if (payload is not null) payload.IsSelected = true;
+            if (payload is not null)
+            {
+                _changingExportSelection = true;
+                try { SelectAutomaticExportDependency(payload); }
+                finally { _changingExportSelection = false; }
+            }
         }
         ++_librarySelectionRevision; _librarySelectedResource = references[0]; LibraryAnalysisBusy = false;
         _librarySelectionCaption = references.Length == 1 ? null : $"{references.Length} 个参考工作流的依赖";
@@ -104,18 +114,16 @@ public sealed partial class ShellViewModel
     private void InvalidateExport()
     {
         ++_exportInputRevision;
+        _exportPlanningCancellation?.Cancel();
         _zipExport = null;
         foreach (var name in new[] { nameof(ExportWorkflows), nameof(ExportModels), nameof(ExportNodes), nameof(ExportSummary), nameof(ExportFiles) }) OnPropertyChanged(name);
         NotifyTransferState();
-        if (!_changingExportSelection && CurrentPage == FlowPage.Packaging)
-        {
-            _exportRefreshPending = true;
-            if (!_coreBusy) _ = QueueExportRefreshAsync();
-        }
+        if (CurrentPage == FlowPage.Packaging)
+            SetExportState(SelectedExportResources.Count > 0 ? TransferState.NeedsAttention : TransferState.Empty,
+                SelectedExportResources.Count > 0 ? "选择已更新，等待重新核算；可更新预览或直接导出。" : "请返回资源库选择资源。");
         CommandManager.InvalidateRequerySuggested();
     }
-    private bool IncludedInExport(ResourceKind kind) => kind switch
-    { ResourceKind.Workflow => ExportWorkflows, ResourceKind.Model => ExportModels, ResourceKind.CustomNode => ExportNodes, ResourceKind.Asset => true, _ => false };
+    private bool IncludedInExport(ResourceKind kind) => kind is ResourceKind.Workflow or ResourceKind.Model or ResourceKind.CustomNode or ResourceKind.Asset;
 
     private void RebuildResourceTrees()
     {
@@ -167,7 +175,15 @@ public sealed partial class ShellViewModel
 
     private void ResourceExportChoiceChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs args)
     {
-        if (args.PropertyName is nameof(ResourceSelection.IsSelected) or nameof(ResourceSelection.IsReference)) { SyncExportRows(); InvalidateExport(); }
+        if (args.PropertyName != nameof(ResourceSelection.IsSelected) || sender is not ResourceSelection row) return;
+        if (!_changingExportSelection)
+        {
+            if (!row.IsSelected) _manuallyExcludedExportPaths.Add(row.Path);
+            else _manuallyExcludedExportPaths.Remove(row.Path);
+            row.ExportSelectionOrigin = row.IsSelected ? ExportSelectionOrigin.User : ExportSelectionOrigin.ManuallyExcluded;
+            _automaticallySelectedExportPaths.Remove(row.Path);
+        }
+        SyncExportRows(); InvalidateExport();
     }
     private void ApplyResourceTreeFilter()
     {

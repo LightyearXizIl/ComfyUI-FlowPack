@@ -1,4 +1,5 @@
 using System.IO;
+using System.IO.Compression;
 using System.Reflection;
 using System.Text.Json;
 using System.Windows.Threading;
@@ -78,12 +79,22 @@ public sealed class TransferFlowTests
         Assert.Contains(vm.ExportFiles, x => x.ArchivePath.StartsWith("custom_nodes/", StringComparison.Ordinal));
         if (withInput) Assert.Contains(vm.ExportFiles, x => x.ArchivePath == "input/fixture.png");
         var model = vm.LocalModels[0];
+        Assert.Equal(ExportSelectionOrigin.AutomaticDependency, model.ExportSelectionOrigin);
+        Assert.Contains("自动加入", model.ExportSelectionLabel);
+        var plansBefore = (await fixture.Client.CallAsync<IReadOnlyList<WorkerJob>>("job.list", new { })).Count(x => x.Operation == "export.plan");
         model.IsSelected = false;
+        Assert.DoesNotContain(model, vm.ExportSelectionRows);
+        Assert.Empty(vm.ExportFiles);
+        Assert.True(vm.SaveZipCommand.CanExecute(null));
         await fixture.IdleAsync();
+        Assert.Equal(plansBefore, (await fixture.Client.CallAsync<IReadOnlyList<WorkerJob>>("job.list", new { })).Count(x => x.Operation == "export.plan"));
         vm.PreviewZipCommand.Execute(null);
         await fixture.IdleAsync();
         Assert.False(model.IsSelected);
         Assert.DoesNotContain(vm.ExportFiles, x => x.SourcePath == model.Path);
+        await InvokeAsync(vm, "ScanSelectedInstanceAsync");
+        model = Assert.Single(vm.LocalModels);
+        Assert.False(model.IsSelected);
         vm.ReturnToResourcesCommand.Execute(null);
         vm.ResourceFilter = "workflow";
         vm.BeginExportCommand.Execute(null);
@@ -117,6 +128,48 @@ public sealed class TransferFlowTests
     });
 
     [Fact]
+    public Task Only_current_checked_workflow_is_written_and_old_draft_cannot_restore_unchecked_resources() => RunStaAsync(async () =>
+    {
+        await using var fixture = await Fixture.CreateAsync(false);
+        var second = Path.Combine(Path.GetDirectoryName(fixture.WorkflowPath)!, "second.json");
+        await File.WriteAllTextAsync(second, await File.ReadAllTextAsync(fixture.WorkflowPath));
+        var vm = fixture.ViewModel;
+        await fixture.ScanAsync();
+        foreach (var workflow in vm.LocalWorkflows) workflow.IsSelected = true;
+        var draft = new PackageDraft("legacy", vm.LocalWorkflows[0].Resource.Id, "Old", "1", "", "", null, "", DistributionDeclaration.Unspecified, 1);
+        await fixture.Client.SaveDraftAsync(draft);
+        vm.BeginExportCommand.Execute(null);
+        await fixture.IdleAsync();
+        var retained = vm.LocalWorkflows[0].Path;
+        vm.LocalWorkflows[1].IsSelected = false;
+        foreach (var row in vm.LocalModels.Concat(vm.LocalNodes).Concat(vm.LocalExportAssets)) row.IsSelected = false;
+        Assert.Equal(retained, Assert.Single(vm.ExportSelectionRows).Path);
+        await InvokeAsync(vm, "ScanSelectedInstanceAsync");
+        Assert.Equal(retained, Assert.Single(vm.SelectedExportResources).Path);
+        await InvokeAsync(vm, "RefreshInstancesAsync");
+        Assert.Equal(retained, Assert.Single(vm.SelectedExportResources).Path);
+        Assert.Equal(retained, Assert.Single(vm.ExportSelectionRows).Path);
+        vm.BeginExportCommand.Execute(null);
+        await fixture.IdleAsync();
+        Assert.Equal(retained, Assert.Single(vm.SelectedExportResources).Path);
+        var output = Path.Combine(fixture.Root, "workflow-only.zip");
+        await vm.ExportZipToAsync(output);
+        Assert.Single(vm.ExportFiles);
+        using (var zip = ZipFile.OpenRead(output))
+        {
+            Assert.Equal(2, zip.Entries.Count);
+            using var manifest = JsonDocument.Parse(zip.GetEntry("flowpack-manifest.json")!.Open());
+            var payload = Assert.Single(manifest.RootElement.GetProperty("resources").EnumerateArray());
+            Assert.Equal(Assert.Single(vm.ExportFiles).ArchivePath, payload.GetProperty("path").GetString());
+        }
+        Assert.Equal(draft, Assert.Single(await fixture.Client.LoadDraftsAsync()).Draft);
+        vm.ClearExportSelectionCommand.Execute(null);
+        await InvokeAsync(vm, "ScanSelectedInstanceAsync");
+        Assert.Empty(vm.SelectedExportResources);
+        Assert.Empty(vm.ExportSelectionRows);
+    });
+
+    [Fact]
     public Task Changed_selection_discards_an_in_flight_export_plan_before_enabling_save() => RunStaAsync(async () =>
     {
         await using var fixture = await Fixture.CreateAsync(false);
@@ -135,6 +188,9 @@ public sealed class TransferFlowTests
         await fixture.IdleAsync();
         Assert.DoesNotContain(vm.ExportFiles, x => x.SourcePath == vm.LocalModels[0].Path);
         Assert.False(vm.LocalModels[0].IsSelected);
+        Assert.True(fixture.ExportPlanCancellationRequests > 0);
+        Assert.Empty(vm.ExportFiles);
+        Assert.Equal(TransferState.NeedsAttention, vm.ExportState);
     });
 
     [Fact]
@@ -229,6 +285,7 @@ public sealed class TransferFlowTests
         public WorkerLibraryClient Client { get; private set; } = null!;
         public InstanceDescriptor TargetInstance { get; private set; } = null!;
         public bool HoldExportPlan { get; set; }
+        public int ExportPlanCancellationRequests { get; private set; }
         public TaskCompletionSource PlanEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource ReleasePlan { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly CancellationTokenSource _lifetime = new(TimeSpan.FromSeconds(60));
@@ -279,6 +336,7 @@ public sealed class TransferFlowTests
                 while (!f.Token.IsCancellationRequested)
                     await server.ServeOnceAsync(async (request, token) =>
                     {
+                        if (request.Command == "task.cancel") f.ExportPlanCancellationRequests++;
                         var response = await f._worker.HandleAsync(request, token);
                         if (f.HoldExportPlan && request.Command == "export.plan")
                         {

@@ -1,5 +1,5 @@
 ﻿#ifndef MyAppVersion
-  #define MyAppVersion "0.0.6"
+  #define MyAppVersion "0.0.8"
 #endif
 
 #define MyAppName "ComfyUI FlowPack"

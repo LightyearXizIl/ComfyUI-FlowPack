@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FlowPack.ComfyUI;
 
 namespace FlowPack.Infrastructure;
@@ -26,16 +25,10 @@ public static class DesktopProfileOptions
         if (!Directory.Exists(root)) throw new DirectoryNotFoundException("指定的 Desktop 配置目录不存在：" + root);
         var registry = Path.Combine(root, "installations.json");
         if (!File.Exists(registry)) throw new FileNotFoundException("指定的 Desktop 配置目录缺少 installations.json；不会使用默认配置。", registry);
-        using var records = JsonDocument.Parse(File.ReadAllText(registry));
-        if (records.RootElement.ValueKind != JsonValueKind.Array || records.RootElement.EnumerateArray().Any(record => record.ValueKind != JsonValueKind.Object))
-            throw new InvalidDataException("指定的 Desktop 实例登记必须是对象数组；不会使用默认配置。");
-        var settings = Path.Combine(root, "settings.json");
-        if (File.Exists(settings))
-        {
-            using var document = JsonDocument.Parse(File.ReadAllText(settings));
-            if (document.RootElement.ValueKind != JsonValueKind.Object)
-                throw new InvalidDataException("指定的 Desktop 设置必须是 JSON 对象；不会使用默认配置。");
-        }
+        // Content errors belong in InstanceDiscoveryReport. Requiring every record
+        // and settings file to parse here hid otherwise valid instances before the
+        // UI could display diagnostics. The explicit profile remains an isolation
+        // boundary even when its registration is malformed.
         return root;
     }
 

@@ -49,8 +49,8 @@ flowchart LR
 
 - Worker 在库的 `state/worker.lock` 上持有独占文件锁；启动协调另用 `worker-launch.lock`，避免多个窗口重复启动。
 - [NamedPipeWorkerProtocol](../src/FlowPack.Infrastructure/NamedPipeWorkerProtocol.cs) 使用当前 Windows 用户可访问的管道，并检查每次会话的随机密钥、协议版本和请求标识。管道中传输 JSON 元数据，不传输模型二进制内容。
-- 当前 [WorkerProtocol](../src/FlowPack.Core/WorkerProtocol.cs) 版本为 `6`。App、Worker 应成对打包；协议不匹配会拒绝请求。
-- App 可指定 `--desktop-profile <绝对目录>`，经工作区与客户端传给 Worker。该目录须存在并包含有效登记；实例发现与关联使用这一配置，不回落默认配置。Worker 会话保存规范化后的配置路径，同库的其他配置会话拒绝连接；旧会话缺少该字段时只接受默认配置。该参数不授予安装资格。
+- 当前 [WorkerProtocol](../src/FlowPack.Core/WorkerProtocol.cs) 版本为 `7`。`instance.discover` 返回 `InstanceDiscoveryReport`，包含实例、配置根、检查来源、跳过原因和读取错误。App、Worker 应成对打包；协议不匹配会拒绝请求。
+- App 可指定 `--desktop-profile <绝对目录>`，经工作区与客户端传给 Worker。该目录须存在并包含 `installations.json`；内容错误交由检测报告呈现，实例发现与关联始终限制在这一配置。Worker 会话保存规范化后的配置路径，同库的其他配置会话拒绝连接；旧会话缺少该字段时只接受默认配置。该参数不授予安装资格。
 - 长任务先返回 `WorkerJob`，客户端轮询 `job.get` 取得阶段、进度与最终结果。连接中断会尝试重连；UI 断开不会直接结束 Worker 中已启动的业务任务。
 - 资源库的元数据和业务任务经 Worker 处理；界面偏好和应用日志由各自的设置服务保存。不要从新页面直接另开 SQLite 写连接或绕过 Worker 执行安装。
 
@@ -58,7 +58,7 @@ flowchart LR
 
 ## 实例发现、资源扫描与在线核对
 
-1. [DesktopInstanceDiscovery](../src/FlowPack.ComfyUI/DesktopInstanceDiscovery.cs) 读取 Desktop 登记、设置和资源搜索配置，形成 `InstanceDescriptor`。描述符分别保存 Core、数据、用户、工作流、节点、模型和 Python 路径，以及配置指纹和问题列表；不能假定这些目录都位于一个根目录。
+1. [DesktopInstanceDiscovery](../src/FlowPack.ComfyUI/DesktopInstanceDiscovery.cs) 读取 Desktop 登记、设置和资源搜索配置，并检查已知本地目录及 Desktop 进程的配置来源，形成 `InstanceDiscoveryReport`。未登记候选仅提供只读能力；显式配置保持独立范围。每个配置来源与登记分别隔离错误，报告保留检查、跳过和读取原因。描述符分别保存 Core、数据、用户、工作流、节点、模型和 Python 路径，以及配置指纹和问题列表；不能假定这些目录都位于一个根目录。
 2. [ResourceInventoryService](../src/FlowPack.ComfyUI/ResourceInventory.cs) 扫描该描述符中的真实目录。额外模型搜索路径单独记录；节点类型归属于节点包；工作流必须通过格式识别，索引等非工作流 JSON 不进入工作流列表。遍历排除虚拟环境、缓存、版本控制目录、链接和已列明的私密文件。
 3. [InstanceVersionReader](../src/FlowPack.ComfyUI/InstanceVersionReader.cs) 从 Core 的 `comfyui_version.py` 和 Desktop 可执行文件产品版本读取本地版本。读取不到时返回空值，由界面显示“未确认”。
 4. [RuntimeNodeInspector](../src/FlowPack.ComfyUI/RuntimeNodeInspector.cs) 只对能唯一归属于所选实例的运行端点读取 `/system_stats` 和 `/object_info`。它核对进程、端口和启动路径，并在读取后再次确认端点，避免串用另一实例的数据。运行 Core 版本与磁盘版本分别保存。
@@ -81,7 +81,7 @@ flowchart LR
 - `PlanAsync` 展开已选资源，核对模型目录配套文件，计算大小和 SHA-256，检查相对路径与同名异内容冲突。节点按整个节点包的可迁移文件导出，沿用资源遍历的排除规则。
 - `ExportAsync` 写临时 ZIP，复制时再次计算 SHA-256，写入 `flowpack-manifest.json`；全部完成后才移动为最终文件。输出已存在时拒绝覆盖，失败或取消时清理本次临时文件。
 
-调整勾选后界面自动更新计划，并以输入版本校验丢弃过期结果；详细路径和校验信息放入高级详情，不再另开重复预览弹窗。Worker 只接受由自身保存过的原始导出计划，不能继续沿用修改选择前的旧计划。
+调整勾选后界面立即更新最终清单并使旧计划失效；首次进入页面、“更新导出预览”或导出前才核算文件。未改变的路径、大小及修改时间可复用进程内哈希缓存，写 ZIP 时仍验证实际字节。输入版本与取消任务共同阻止旧结果覆盖新选择。普通导出不再读取或写回旧 `PackageDraft`；详细路径和校验信息放入高级详情。Worker 只接受由自身保存过的原始导出计划。
 
 ## 导入、暂存与安装的边界
 

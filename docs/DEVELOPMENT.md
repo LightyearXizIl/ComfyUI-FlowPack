@@ -10,7 +10,7 @@
 - [global.json](../global.json) 指定 .NET SDK `10.0.112`、`rollForward: latestPatch`、不接受预览版。可使用对应功能带内适配的更新补丁；不是任意 .NET 10 SDK 都符合此选择规则。
 - PowerShell。只有生成正式安装器时需要 Inno Setup 6；便携包不需要 Inno Setup。
 - NuGet 包版本集中在 [Directory.Packages.props](../Directory.Packages.props)，各项目提交 `packages.lock.json`。常规还原使用 `--locked-mode`，不要为了绕过失败删除锁文件。
-- 源码版本由 [VERSION](../VERSION) 与 [Directory.Build.props](../Directory.Build.props) 管理，当前为 `0.0.6`。界面测试改动不自动代表新版本已发布。
+- 源码版本由 [VERSION](../VERSION) 与 [Directory.Build.props](../Directory.Build.props) 管理，当前为 `0.0.8`。版本发布状态见[项目状态](PROJECT_STATUS.md)。
 
 从项目根目录运行以下命令。示例路径是本工作区，其他电脑按实际克隆目录修改。
 
@@ -23,7 +23,7 @@ dotnet --version
 
 普通导出只有一份 `IsSelected` 最终清单；旧草稿的 `IsReference` 字段继续兼容，但不是第二份页面选择。进入导出时自动补充能唯一确认的工作流依赖，同一选择范围内每个工作流只补一次；取消依赖后，更新计划或返回不会恢复勾选，显式“重新添加依赖”才补选。导入选择来源后自动分析并生成计划。导入、导出的异步结果必须核对输入版本，来源、实例或选择变化后不能用旧结果启用执行按钮。
 
-当前 Worker 协议为 **6**，App/Worker 必须成对构建和打包。安装计划的可空 `RequiresPythonDependencies` 由 Worker 依据声明、`requirements.txt`、`pyproject.toml` 计算，界面与执行能力检查共用；执行前重新核验实际需求与内置资格，旧计划缺少该字段时拒绝安装并要求重新生成。
+当前 Worker 协议为 **7**，App/Worker 必须成对构建和打包。实例发现返回含来源和错误的 `InstanceDiscoveryReport`。安装计划的可空 `RequiresPythonDependencies` 由 Worker 依据声明、`requirements.txt`、`pyproject.toml` 计算，界面与执行能力检查共用；执行前重新核验实际需求与内置资格，旧计划缺少该字段时拒绝安装并要求重新生成。
 
 App 支持 `--desktop-profile <绝对目录>` 并传给 Worker；目录须存在并包含有效登记，显式配置的发现和关联不回落用户默认配置。同库 Worker 会话绑定规范化配置路径，不同配置拒绝连接；旧会话缺字段只接受默认配置。隔离验收应同时使用独立 FlowPack 资源库；该参数仅限定发现范围，不授予文件或 Python 安装资格。
 

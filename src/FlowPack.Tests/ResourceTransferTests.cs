@@ -144,6 +144,37 @@ public sealed class ResourceTransferTests : IDisposable
     }
 
     [Fact]
+    public async Task Preview_reuses_unchanged_hashes_and_rehashes_changed_files_but_export_still_verifies_content()
+    {
+        var file = Path.Combine(_root, "cache.safetensors");
+        await File.WriteAllTextAsync(file, "first");
+        var resources = new[] { new LocalResource("m", ResourceKind.Model, "cache", file, "checkpoints/cache.safetensors") };
+        var initial = new Recorder();
+        var first = await new PlannedZipExportService().PlanAsync(resources, progress: initial);
+        Assert.DoesNotContain(initial.Values, x => x.Stage == "复用未变化文件的校验结果");
+        var cached = new Recorder();
+        var second = await new PlannedZipExportService().PlanAsync(resources, progress: cached);
+        Assert.Equal(Assert.Single(first.Files).Sha256, Assert.Single(second.Files).Sha256);
+        Assert.Contains(cached.Values, x => x.Stage == "复用未变化文件的校验结果");
+        var originalWrite = File.GetLastWriteTimeUtc(file);
+        await File.WriteAllTextAsync(file, "other");
+        File.SetLastWriteTimeUtc(file, originalWrite.AddSeconds(2));
+        var changed = new Recorder();
+        var third = await new PlannedZipExportService().PlanAsync(resources, progress: changed);
+        Assert.NotEqual(Assert.Single(second.Files).Sha256, Assert.Single(third.Files).Sha256);
+        Assert.DoesNotContain(changed.Values, x => x.Stage == "复用未变化文件的校验结果");
+        // Metadata reuse is an optimization only: execution hashes every byte again.
+        var cachedWrite = File.GetLastWriteTimeUtc(file);
+        await File.WriteAllTextAsync(file, "again");
+        File.SetLastWriteTimeUtc(file, cachedWrite);
+        var stale = await new PlannedZipExportService().PlanAsync(resources);
+        var output = Path.Combine(_root, "stale.zip");
+        await Assert.ThrowsAsync<IOException>(() => new PlannedZipExportService().ExportAsync(stale, output));
+        Assert.False(File.Exists(output));
+        Assert.Empty(Directory.GetFiles(_root, "*.tmp"));
+    }
+
+    [Fact]
     public void Disk_only_section_is_unverified_offline_and_resource_filter_preserves_checks()
     {
         var vm = new ShellViewModel();

@@ -5,10 +5,10 @@
    <StackPanel><TextBlock Text="导出资源" Style="{StaticResource PageTitle}"/><TextBlock Text="确认这次要带走的资源，取消勾选可将它留在当前电脑。" Style="{StaticResource SubtleText}" Margin="0,8,0,0"/></StackPanel>
   </DockPanel>
   <Border Grid.Row="1" Style="{StaticResource Card}"><Grid><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-   <DockPanel Margin="0,0,0,12"><Button DockPanel.Dock="Right" Content="重新添加依赖" Command="{Binding ReAddExportDependenciesCommand}" ToolTip="重新加入当前勾选工作流用到的可确认依赖"/><StackPanel><TextBlock Text="导出清单" Style="{StaticResource SectionTitle}"/><TextBlock Text="{Binding ExportContentsSummary}" Style="{StaticResource SubtleText}" Margin="0,6,0,0"/></StackPanel></DockPanel>
+   <DockPanel Margin="0,0,0,12"><StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><Button Content="更新导出预览" Command="{Binding PreviewZipCommand}" Margin="0,0,8,0"/><Button Content="重新添加依赖" Command="{Binding ReAddExportDependenciesCommand}" ToolTip="重新加入当前勾选工作流用到的可确认依赖，包括此前手动取消的项目"/></StackPanel><StackPanel><TextBlock Text="导出清单" Style="{StaticResource SectionTitle}"/><TextBlock Text="{Binding ExportContentsSummary}" Style="{StaticResource SubtleText}" Margin="0,6,0,0"/></StackPanel></DockPanel>
    <ListBox Grid.Row="1" ItemsSource="{Binding ExportSelectionRows}" IsEnabled="{Binding CoreReady}" BorderThickness="0" Background="Transparent" Foreground="{DynamicResource TextBrush}" HorizontalContentAlignment="Stretch" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True" AutomationProperties.Name="最终导出清单"><ListBox.ItemTemplate><DataTemplate>
     <Border Padding="0,10" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"><DockPanel>
-     <TextBlock DockPanel.Dock="Right" Text="{Binding KindLabel}" Style="{StaticResource SubtleText}" VerticalAlignment="Center" Margin="16,0,0,0"/>
+     <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Margin="16,0,0,0"><TextBlock Text="{Binding KindLabel}" Style="{StaticResource SubtleText}"/><TextBlock Text="{Binding ExportSelectionLabel}" Style="{StaticResource SubtleText}"/></StackPanel>
      <CheckBox IsChecked="{Binding IsSelected,Mode=TwoWay}" AutomationProperties.Name="{Binding Name}"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}"/></CheckBox>
     </DockPanel></Border>
    </DataTemplate></ListBox.ItemTemplate></ListBox>

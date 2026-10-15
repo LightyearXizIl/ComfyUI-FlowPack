@@ -37,19 +37,23 @@ public sealed class DesktopProfileTests : IDisposable
     }
 
     [Fact]
-    public void Missing_or_invalid_explicit_registration_fails_without_falling_back()
+    public async Task Missing_explicit_registration_fails_and_invalid_content_stays_inside_profile_report()
     {
         var profile = MakeProfile("invalid");
         var registry = Path.Combine(profile, "installations.json");
         File.Delete(registry);
         Assert.Throws<FileNotFoundException>(() => new WorkerLibraryClient(Path.Combine(_root, "library"), desktopProfile: profile));
         File.WriteAllText(registry, "{}");
-        Assert.Throws<InvalidDataException>(() => DesktopProfileOptions.NormalizeAndValidate(profile));
+        Assert.Equal(profile, DesktopProfileOptions.NormalizeAndValidate(profile));
+        var invalidRegistry = await new DesktopInstanceDiscovery(new ProfilePaths(_root), profile).DiscoverReportAsync();
+        Assert.Empty(invalidRegistry.Instances); Assert.NotEmpty(invalidRegistry.Errors);
         File.WriteAllText(registry, "[1]");
-        Assert.Throws<InvalidDataException>(() => DesktopProfileOptions.NormalizeAndValidate(profile));
+        Assert.Equal(profile, DesktopProfileOptions.NormalizeAndValidate(profile));
+        Assert.NotEmpty((await new DesktopInstanceDiscovery(new ProfilePaths(_root), profile).DiscoverReportAsync()).SkippedSources);
         File.WriteAllText(registry, "[]");
         File.WriteAllText(Path.Combine(profile, "settings.json"), "[]");
-        Assert.Throws<InvalidDataException>(() => DesktopProfileOptions.NormalizeAndValidate(profile));
+        Assert.Equal(profile, DesktopProfileOptions.NormalizeAndValidate(profile));
+        Assert.Contains((await new DesktopInstanceDiscovery(new ProfilePaths(_root), profile).DiscoverReportAsync()).Errors, x => x.Contains("settings.json"));
         Assert.False(Directory.Exists(Path.Combine(_root, "library")));
     }
 
@@ -94,6 +98,25 @@ public sealed class DesktopProfileTests : IDisposable
             timeout.Cancel();
             try { await serving; } catch (OperationCanceledException) { }
         }
+    }
+
+    [Fact]
+    public async Task Client_rejects_old_live_worker_instead_of_launching_another_worker()
+    {
+        var library = Path.Combine(_root, "library-old-worker");
+        var state = Path.Combine(library, "state");
+        Directory.CreateDirectory(state);
+        var pipe = "flowpack-old-worker-" + Guid.NewGuid().ToString("N");
+        await File.WriteAllTextAsync(Path.Combine(state, "worker-session.json"), JsonSerializer.Serialize(new { Pipe = pipe, Secret = "test" }));
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var server = new NamedPipeWorkerServer(pipe, "test");
+        var serving = server.ServeOnceAsync((request, _) => Task.FromResult(new WorkerResponse(request.RequestId, false,
+            Error: new WorkerError("unsupported-protocol", "旧 Worker"))), timeout.Token);
+        await using var client = new WorkerLibraryClient(library, allowWorkerLaunch: false);
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => client.InitializeAsync(timeout.Token));
+        Assert.Contains("协议版本不兼容", error.Message);
+        Assert.Contains(WorkerProtocol.Version, error.Message);
+        await serving;
     }
 
     [Fact]

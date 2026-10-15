@@ -38,7 +38,7 @@ public sealed record LibrarySaveInput(PackageManifest? Manifest = null, Workflow
 public sealed class PersistentWorkerService : IAsyncDisposable
 {
     private readonly ResourceLibraryDatabase _database;
-    private readonly Func<CancellationToken, Task<IReadOnlyList<InstanceDescriptor>>> _discover;
+    private readonly Func<CancellationToken, Task<InstanceDiscoveryReport>> _discover;
     private readonly Func<string, CancellationToken, Task<InstanceDescriptor>> _associate;
     private readonly ConcurrentDictionary<string, WorkerJob> _jobs = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _tokens = new();
@@ -52,9 +52,12 @@ public sealed class PersistentWorkerService : IAsyncDisposable
 
     public PersistentWorkerService(ResourceLibraryDatabase database,
         Func<CancellationToken, Task<IReadOnlyList<InstanceDescriptor>>>? discover = null, IDeploymentCapabilityProvider? capabilities = null, GlobalWorkCoordinator? coordinator = null,
-        Func<string, CancellationToken, Task<InstanceDescriptor>>? associate = null)
+        Func<string, CancellationToken, Task<InstanceDescriptor>>? associate = null,
+        Func<CancellationToken, Task<InstanceDiscoveryReport>>? discoverReport = null)
     {
-        _database = database; _discover = discover ?? (ct => new DesktopInstanceDiscovery().DiscoverAsync(ct));
+        _database = database;
+        _discover = discoverReport ?? (discover is null ? ct => new DesktopInstanceDiscovery().DiscoverReportAsync(ct) :
+            async ct => new(await discover(ct), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Comfy Desktop"), [], [], []));
         _associate = associate ?? ((path, ct) => new DesktopInstanceDiscovery().AssociateAsync(path, ct));
         _capabilities = capabilities ?? new DeploymentCapabilityProvider();
         _coordinator = coordinator ?? new GlobalWorkCoordinator();
@@ -428,11 +431,11 @@ public sealed class PersistentWorkerService : IAsyncDisposable
                     throw new InvalidDataException("安装计划的 Python 依赖依据不一致，请重新生成安装计划。");
                 var pythonService = new PythonDependencyService(_database.LibraryPath);
                 PythonDependencyPlan? pythonPlan = null;
-                var executionInstance = (await _discover(token)).SingleOrDefault(x => x.Id == install.Instance.Id) ?? throw new InvalidDataException("目标实例不再存在。");
+                var executionInstance = (await _discover(token)).Instances.SingleOrDefault(x => x.Id == install.Instance.Id) ?? throw new InvalidDataException("目标实例不再存在。");
                 RequireCapability(executionInstance, install.RequiresPythonDependencies is true);
                 await new ResourceInstallationService(_database.LibraryPath).ExecuteAsync(install, async (prior, ct) =>
                 {
-                    var current = (await _discover(ct)).SingleOrDefault(x => x.Id == prior.Id) ?? throw new InvalidDataException("目标实例不再存在。");
+                    var current = (await _discover(ct)).Instances.SingleOrDefault(x => x.Id == prior.Id) ?? throw new InvalidDataException("目标实例不再存在。");
                     RequireCapability(current, install.RequiresPythonDependencies is true);
                     return current;
                 },
@@ -539,7 +542,7 @@ public sealed class PersistentWorkerService : IAsyncDisposable
 
     private async Task<ResourceInventory> ScanRuntimeInventoryAsync(InstanceDescriptor instance, CancellationToken token, IProgress<OperationProgress>? progress = null)
     {
-        var peers = await _discover(token);
+        var peers = (await _discover(token)).Instances;
         var current = peers.SingleOrDefault(x => x.Id == instance.Id) ?? instance;
         var inventory = await new ResourceInventoryService().ScanAsync(current, token, progress);
         using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromSeconds(8) };
