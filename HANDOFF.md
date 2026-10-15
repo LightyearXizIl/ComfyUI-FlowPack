@@ -1,10 +1,10 @@
 ﻿# ComfyUI FlowPack 开发交接
 
-## 当前工作区 · 2026-10-15 导出与实例发现修复
+## 当前版本 · 0.0.8
 
-本轮修改和便携测试包已完成，发布源码版本已同步为 0.0.8、App/Worker 协议为 7。本地正式构建完成：381 通过、0 失败、5 按需专项跳过，安装器和校验清单已生成；远端发布结果待核验。导出只使用当前勾选，排除依赖不会静默加回；普通导出不应用旧草稿，勾选与核算分离。实例发现返回完整诊断，未登记候选保持只读。
+**2026-10-15**：0.0.8 已完成源码、标签、[CI](https://github.com/LightyearXizIl/ComfyUI-FlowPack/actions/runs/38735877841)和[GitHub Release](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.8)发布；标签提交 `e2a5ff0de0a638818b1fdff717d77fc4d11ef922`，App/Worker 协议为 7。导出只使用当前勾选，排除依赖不会静默加回；普通导出不应用旧草稿，勾选与核算分离。实例发现返回完整诊断，未登记候选保持只读。
 
-全量 380 通过、5 项按需专项跳过；最后 23 项边界回归通过。包内 Worker 的单工作流 ZIP/manifest 验证通过；computer-use 窗口绑定故障，外部点击与第二台电脑现场验证仍待完成。接手先读[本轮修复记录](docs/EXPORT_DISCOVERY_REPAIR_2026-10-15.md)，使用[新便携测试包](artifacts/portable/FlowPack-ExportDiscovery-20261015.zip)。
+本地与 CI Release 均为 **381 通过、0 失败、5 项按需专项跳过**。远端安装器 **74951332 字节**，SHA-256 `58E9BB196495CD8542C31884CF6E442D17FCF25BA04008867A3069EAD501743A`，已下载并与校验文件、GitHub API digest 核对。正式文件位于 `artifacts/installer`，本地构建副本单独保留。接手先读[发布证据](docs/release-evidence/0.0.8/README.md)及[修复记录](docs/EXPORT_DISCOVERY_REPAIR_2026-10-15.md)。修复阶段包内 Worker 的单工作流 ZIP/manifest 验证通过；外部点击受 computer-use 故障影响，第二台电脑、干净机器及真实 Desktop 推理验收仍待完成。
 
 ## 历史版本 · 0.0.7
 
@@ -12,7 +12,7 @@
 
 本地标准 Release 已完成：**368 通过、0 失败、5 按需专项跳过**（373 总计）。安装器 **74893235 字节**，SHA-256 `3E60936E65A66EA9CF7A1B28AE48842695F057BF556B95B3234D882112965FDB`；App、Worker 与安装器校验清单位于 `artifacts/installer`。远端 [Release 工作流](https://github.com/LightyearXizIl/ComfyUI-FlowPack/actions/runs/38555556264) 已成功，正式 [v0.0.7 Release](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.7) 已发布。远端下载安装器 **74947639 字节**，SHA-256 `DCE74221F86EF1695362B445917BE7AF2CCDBD9B32C0285C74EDE9EE995C7A27`，与远端 `SHA256SUMS.txt` 一致；CI 构建包与本地构建包因构建环境不同，分别记录。
 
-## 当前版本 · 0.0.6
+## 历史版本 · 0.0.6
 
 **2026-10-05**：导入安装页及展开后的按钮共用首页和弹窗的白底黑字圆角样式，资源输入、折叠区、目标选择和状态沿用共享主题。首页保持原排版，详情继续居中。资源库、自动依赖导出、自动导入计划、Python 能力判定、日志与更新改进一并进入本版本。
 

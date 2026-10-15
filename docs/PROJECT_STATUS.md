@@ -1,10 +1,12 @@
 ﻿# FlowPack 当前状态与交接摘要
 
-## 当前工作区 · 2026-10-15 导出与实例发现修复
+## 当前版本 · 0.0.8
 
-导出清单、手动排除、旧草稿隔离、显式预览及哈希复用已实现；实例发现补充已知目录与进程来源，首页提供检测详情。App/Worker 协议为 7，源码版本已同步为 0.0.8。本地正式构建完成：381 通过、0 失败、5 按需专项跳过；安装器和校验清单位于 `artifacts/installer`。源码标签、CI 与远端结果待核验后补录。
+**2026-10-15**：导出清单、手动排除、旧草稿隔离、显式预览及哈希复用已实现；实例发现补充已知目录与进程来源，首页提供检测详情。App/Worker 协议为 7。源码已推送，标签 `v0.0.8` 固定于 `e2a5ff0de0a638818b1fdff717d77fc4d11ef922`；[发布工作流](https://github.com/LightyearXizIl/ComfyUI-FlowPack/actions/runs/38735877841)成功，[正式 Release](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.8)已发布。本地与 CI 均为 **381 通过、0 失败、5 按需专项跳过**。
 
-全量 380 通过、5 按需专项跳过；最后 23 项边界回归通过，Release 构建零警告错误。已生成并核验[便携测试包](../artifacts/portable/FlowPack-ExportDiscovery-20261015.zip)，实际包内 Worker 的单工作流 ZIP 与 manifest 验证通过。computer-use 窗口绑定故障，外部点击验收及另一台电脑现场验证待完成，详见[本轮修复记录](EXPORT_DISCOVERY_REPAIR_2026-10-15.md)。
+远端下载安装器 **74951332 字节**，SHA-256 `58E9BB196495CD8542C31884CF6E442D17FCF25BA04008867A3069EAD501743A`，与 GitHub API digest 和 `SHA256SUMS.txt` 一致。`artifacts/installer` 保存远端正式文件，本地构建副本位于 `artifacts/archive/release-0.0.8-local`。完整记录见[发布证据](release-evidence/0.0.8/README.md)。
+
+修复阶段的 380 项全量回归及最后 23 项边界回归已通过，版本升级后的正式测试以本节 381 项为准。此前[便携测试包](../artifacts/portable/FlowPack-ExportDiscovery-20261015.zip)的包内 Worker 单工作流 ZIP 与 manifest 验证通过。computer-use 窗口绑定故障，外部点击验收及另一台电脑现场验证待完成；本轮未新增真实 Desktop 安装或推理，详见[本轮修复记录](EXPORT_DISCOVERY_REPAIR_2026-10-15.md)。
 
 ## 历史版本 · 0.0.7
 
@@ -12,7 +14,7 @@
 
 本地标准 Release 已完成：**368 通过、0 失败、5 按需专项跳过**（373 总计）。安装器 **74893235 字节**，SHA-256 `3E60936E65A66EA9CF7A1B28AE48842695F057BF556B95B3234D882112965FDB`；App、Worker 与安装器校验清单位于 `../artifacts/installer`。远端 [Release 工作流](https://github.com/LightyearXizIl/ComfyUI-FlowPack/actions/runs/38555556264) 已成功，正式 [v0.0.7 Release](https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.7) 已发布。远端下载安装器 **74947639 字节**，SHA-256 `DCE74221F86EF1695362B445917BE7AF2CCDBD9B32C0285C74EDE9EE995C7A27`，与远端 `SHA256SUMS.txt` 一致；CI 构建包与本地构建包因构建环境不同，分别记录。
 
-## 当前版本 · 0.0.6
+## 历史版本 · 0.0.6
 
 **2026-10-05**：导入安装页及展开后的按钮共用首页和弹窗的白底黑字圆角样式，资源输入、折叠区、目标选择和状态沿用共享主题。首页保持原排版，详情继续居中。资源库、自动依赖导出、自动导入计划、Python 能力判定、日志与更新改进一并进入本版本。
 

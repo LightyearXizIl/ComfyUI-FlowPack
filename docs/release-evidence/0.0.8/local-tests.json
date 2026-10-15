@@ -1,0 +1,17 @@
+{
+  "version": "0.0.8",
+  "scope": "Standard Release automated tests; excludes opt-in real Desktop, independent core, Python integration and ZIP64 acceptance.",
+  "total": 386,
+  "command": ".\\build\\Build-Release.ps1 -Version 0.0.8",
+  "trx": "artifacts/acceptance/release-0.0.8/local/release.trx",
+  "failed": 0,
+  "passed": 381,
+  "skippedTests": [
+    "FlowPack.Tests.DesktopRuntimeAcceptanceTests.Gui_launched_instance_binds_discovery_runtime_dependencies_and_successful_real_output",
+    "FlowPack.Tests.OfficialCoreRoundtripTests.Two_isolated_official_cores_export_install_and_run_real_upscale_model_and_custom_node",
+    "FlowPack.Tests.PythonEnvironmentIntegrationTests.Compatible_wheel_installs_and_existing_version_replacement_is_blocked",
+    "FlowPack.Tests.Zip64RoundtripTests.Actual_archive_over_four_GiB_exports_and_imports_with_matching_hash",
+    "FlowPack.Tests.PythonInterruptedInstallIntegrationTests.Partial_real_wheel_install_is_retained_and_worker_restart_requires_repair"
+  ],
+  "skipped": 5
+}

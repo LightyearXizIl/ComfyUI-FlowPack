@@ -10,7 +10,7 @@
 
 在首页确认实例，扫描后进入“资源库”；勾选资源后进入同一导出清单，或在“导入安装”选择来源并等待自动检查。完整操作说明见[使用指南](docs/USER_GUIDE.md)。
 
-历史便携测试包及临时构建已清理；保留的便携/预览数据位于本机 `artifacts/user-data`，不进入 Git 或安装器。源码开发预览仍可按[开发指南](docs/DEVELOPMENT.md)启动。
+开发便携包和源码预览使用独立 Data；历史保留数据位于本机 `artifacts/user-data`，不进入 Git 或安装器。便携包、正式版与验收边界见[项目状态](docs/PROJECT_STATUS.md)，源码预览按[开发指南](docs/DEVELOPMENT.md)启动。
 
 ## 主要功能
 

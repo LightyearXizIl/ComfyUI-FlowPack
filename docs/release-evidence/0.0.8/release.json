@@ -1,0 +1,70 @@
+{
+  "release": {
+    "isDraft": false,
+    "assets": [
+      {
+        "name": "ComfyUI-FlowPack-0.0.8-Setup.exe",
+        "apiDigest": "sha256:58e9bb196495cd8542c31884cf6e442d17fcf25ba04008867a3069ead501743a",
+        "sha256": "58E9BB196495CD8542C31884CF6E442D17FCF25BA04008867A3069EAD501743A",
+        "sizeBytes": 74951332,
+        "url": "https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/download/v0.0.8/ComfyUI-FlowPack-0.0.8-Setup.exe"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "apiDigest": "sha256:6db17aec08d7f96f24013b0e21ff2a482e77d9fbed2bfb6df46ccf5ed3664948",
+        "sha256": "6DB17AEC08D7F96F24013B0E21FF2A482E77D9FBED2BFB6DF46CCF5ED3664948",
+        "sizeBytes": 290,
+        "url": "https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/download/v0.0.8/SHA256SUMS.txt"
+      }
+    ],
+    "publishedAt": "2026-10-15T12:41:08Z",
+    "isPrerelease": false,
+    "url": "https://github.com/LightyearXizIl/ComfyUI-FlowPack/releases/tag/v0.0.8"
+  },
+  "acceptanceNote": "Source, local and CI Release tests, Windows installer, publication and downloaded asset verified. External click acceptance blocked by computer-use window binding; second-computer discovery, clean-machine install and real Desktop inference remain unverified.",
+  "workflow": {
+    "tests": {
+      "passed": 381,
+      "skipped": 5,
+      "failed": 0,
+      "total": 386
+    },
+    "url": "https://github.com/LightyearXizIl/ComfyUI-FlowPack/actions/runs/38735877841",
+    "conclusion": "success",
+    "id": 38735877841
+  },
+  "remoteDownloadVerification": {
+    "installerSha256": "58E9BB196495CD8542C31884CF6E442D17FCF25BA04008867A3069EAD501743A",
+    "installerMatchesApiDigest": true,
+    "installerMatchesSha256Sums": true,
+    "installerVersion": "0.0.8",
+    "installerSizeBytes": 74951332
+  },
+  "commit": "e2a5ff0de0a638818b1fdff717d77fc4d11ef922",
+  "localBuild": {
+    "workerSha256": "8E764B8692F024E1078E86C3032DEEC2A74A4BA3509B84E725485B710C71D681",
+    "tests": {
+      "version": "0.0.8",
+      "scope": "Standard Release automated tests; excludes opt-in real Desktop, independent core, Python integration and ZIP64 acceptance.",
+      "total": 386,
+      "command": ".\\build\\Build-Release.ps1 -Version 0.0.8",
+      "trx": "artifacts/acceptance/release-0.0.8/local/release.trx",
+      "failed": 0,
+      "passed": 381,
+      "skippedTests": [
+        "FlowPack.Tests.DesktopRuntimeAcceptanceTests.Gui_launched_instance_binds_discovery_runtime_dependencies_and_successful_real_output",
+        "FlowPack.Tests.OfficialCoreRoundtripTests.Two_isolated_official_cores_export_install_and_run_real_upscale_model_and_custom_node",
+        "FlowPack.Tests.PythonEnvironmentIntegrationTests.Compatible_wheel_installs_and_existing_version_replacement_is_blocked",
+        "FlowPack.Tests.Zip64RoundtripTests.Actual_archive_over_four_GiB_exports_and_imports_with_matching_hash",
+        "FlowPack.Tests.PythonInterruptedInstallIntegrationTests.Partial_real_wheel_install_is_retained_and_worker_restart_requires_repair"
+      ],
+      "skipped": 5
+    },
+    "appSha256": "B301B3530A149179C845CC2672BD4D4C641E2EB9ADD38E708A6DC26DF736F07A",
+    "installerSha256": "AA551055184F305007A2EC7D98DEBCEE4778397C7877998CA0CAFBE2A84B6525",
+    "productVersion": "0.0.8+08d1e482d312d63b55f574e51b6b36c60421a33a",
+    "installerSizeBytes": 74962941
+  },
+  "version": "0.0.8",
+  "tag": "v0.0.8"
+}
